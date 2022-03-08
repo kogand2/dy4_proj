@@ -63,10 +63,10 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 }
 
 // Block convolution function
-void state_block_conv(const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
+void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {
 	// allocate memory for the output (filtered) data
-  std::vector<float> y;
+  
 	y.clear();
 	y.resize(x.size(), 0.0);
 

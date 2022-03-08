@@ -29,15 +29,15 @@ if __name__ == "__main__":
 		.format(audio_Fs, audio_data.ndim, len(audio_data)))
 
 	# output binary file name (where samples are written from Python)
-	out_fname = "../data/float32samples.bin"
+	#out_fname = "../data/float32samples.bin"
 	# dump audio data in a binary file where each sample is a 32-bit float
-	audio_data.astype('float32').tofile(out_fname)
-	print(" Written binary data to \"" + out_fname + "\" in float32 format")
+	#audio_data.astype('float32').tofile(out_fname)
+	#print(" Written binary data to \"" + out_fname + "\" in float32 format")
 
 	# input binary file name (from where samples are read into Python)
 	# the default is JUST a SELF-CHECK; of course, change filenames as needed
-	in_fname = "../data/float32samples.bin"
-	# in_fname = "../data/float32filtered.bin"
+	#in_fname = "../data/float32samples.bin"
+	in_fname = "../data/float32filtered.bin"
 	# read data from a binary file (assuming 32-bit floats)
 	float_data = np.fromfile(in_fname, dtype='float32')
 	print(" Read binary data from \"" + in_fname + "\" in float32 format")

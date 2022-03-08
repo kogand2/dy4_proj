@@ -35,8 +35,10 @@ void readBinData(const std::string in_fname, std::vector<float> &bin_data)
 		std::cout << "File " << in_fname << " not found ... exiting\n";
 		exit(1);
 	} else {
+		std::cout << "test";
 		std::cout << "Reading raw binary from \"" << in_fname << "\"\n";
 	}
+	std::cout << "test";
 	fdin.seekg(0, std::ios::end);
 	const unsigned int num_samples = fdin.tellg() / sizeof(float);
 

@@ -1,3 +1,7 @@
+
+#include "block_conv_fn.h"
+#include "dy4.h"
+
 // Custom Demodulation Function
 std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vector<float> &dummy_state) {
   std::vector<float> fm_demod;
@@ -22,7 +26,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   I_new.insert( I_new.end(), I.begin(), I.end() );
   Q_new.insert( Q_new.end(), Q.begin(), Q.end() );
 
-  for (int j = 0; j < I.size(); j++){
+  for (unsigned int j = 0; j < I.size(); j++){
     Q_der = Q_new[j+1] - Q_new[j];
     I_der = I_new[j+1] - I_new[j];
 
@@ -54,7 +58,7 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 	// the rest of the code in this function is to be completed by you
 	// based on your understanding and the Python code from the first lab
 	for (unsigned int i = 0; i < num_taps; i++){
-			if (i == (num_taps-1)/2)
+			if ((int) i == (num_taps-1)/2)
 				h[i] = norm_co;
 			else
 				h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
@@ -66,13 +70,13 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {
 	// allocate memory for the output (filtered) data
-  
+
 	y.clear();
 	y.resize(x.size(), 0.0);
 
 	// implement block processing algorithm discussed in lecture and used in python
-	for (int n = 0; n < y.size(); n++)
-		for (int k = 0; k < h.size(); k++)
+	for (unsigned int n = 0; n < y.size(); n++)
+		for (unsigned int k = 0; k < h.size(); k++)
 			if (n-k >= 0)
 				y[n] += h[k] * x[n - k];
 			else

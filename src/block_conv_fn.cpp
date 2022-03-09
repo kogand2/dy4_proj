@@ -1,6 +1,7 @@
 
 #include "block_conv_fn.h"
 #include "dy4.h"
+#include "iofunc.h"
 
 // Custom Demodulation Function
 std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vector<float> &dummy_state) {
@@ -12,10 +13,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   float I_der;
   float Q_der;
 
-
   fm_demod.resize(I.size(), float(0));
-  I_new.resize(I.size() + 1, float(0));
-  Q_new.resize(Q.size() + 1, float(0));
 
   I_prev = dummy_state[0];
   Q_prev = dummy_state[1];
@@ -32,8 +30,8 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
 
     fm_demod[j] = Q_der*I_new[j+1] - I_der*Q_new[j+1];
 
-    if (pow(Q_new[j+1], 2) + pow(I_new[j+1], 2) != 0){
-      fm_demod[j] = fm_demod[j]/(pow(Q_new[j+1], 2) + pow(I_new[j+1], 2));
+    if (pow(Q_new[j+1], 2.0) + pow(I_new[j+1], 2.0) != 0){
+      fm_demod[j] = fm_demod[j]/(pow(Q_new[j+1], 2.0) + pow(I_new[j+1], 2.0));
     }else{
       fm_demod[j] = 0;
     }
@@ -70,18 +68,21 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {
 	// allocate memory for the output (filtered) data
-
 	y.clear();
 	y.resize(x.size(), 0.0);
 
 	// implement block processing algorithm discussed in lecture and used in python
-	for (unsigned int n = 0; n < y.size(); n++)
-		for (unsigned int k = 0; k < h.size(); k++)
-			if (n-k >= 0)
+	for (int n = 0; n < y.size(); n++){
+		for (int k = 0; k < h.size(); k++){
+			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
-			else
+			}else{
 				y[n] += h[k] * state[state.size() + n - k];
+      }
+    }
+  }
 
   int index = x.size() - h.size();
 	state = std::vector<float>(x.begin() + index, x.end());
+
 }

@@ -79,17 +79,17 @@ int main()
 
 
 		// i and q block convolution
-		std::vector<float> block_split_i(block_size);
-    std::vector<float> block_split_q(block_size);
+		std::vector<float> block_split_i(block_size / 2);
+    std::vector<float> block_split_q(block_size / 2);
 
 		for (int k = 0; k < block_size / 2; k++) {
       block_split_i[k] = block_data[2*k];
       block_split_q[k] = block_data[2*k + 1];
     }
-
+    printRealVector(block_split_i);
 		state_block_conv(i_filt,block_split_i,rf_coeff,state_i_lpf_100k);
 		state_block_conv(q_filt,block_split_q,rf_coeff,state_q_lpf_100k);
-
+    //printRealVector(i_filt);
 		//decimation
 		std::vector<float>i_ds;
 		std::vector<float>q_ds;
@@ -107,6 +107,8 @@ int main()
 		downsample(audio_decim,audio_filt,audio_block);
 
     std::vector<short int> audio_data;
+
+    break;
     for (unsigned int k = 0; k < audio_block.size(); k++) {
       if(std::isnan(audio_block[k])){
         audio_data.push_back(0);

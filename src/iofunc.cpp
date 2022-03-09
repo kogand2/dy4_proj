@@ -13,10 +13,10 @@ Ontario, Canada
 // or to read from/write to binary files in 32-bit float format
 void printRealVector(const std::vector<float> &x)
 {
-	std::cout << "Printing float vector of size " << x.size() << "\n";
+	std::cerr << "Printing float vector of size " << x.size() << "\n";
 	for (unsigned int i = 0; i < x.size(); i++)
-		std::cout << x[i] << " ";
-	std::cout << "\n";
+		std::cerr << x[i] << " ";
+	std::cerr << "\n";
 }
 
 void printComplexVector(const std::vector<std::complex<float>> &X)

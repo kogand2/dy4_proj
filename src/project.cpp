@@ -15,6 +15,13 @@ Ontario, Canada
 #include "logfunc.h"
 #include "block_conv_fn.h"
 
+void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
+  std::vector<int> raw_data(num_samples);
+  std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
+  for(int k = 0; k < (int)num_samples; k++) {
+    block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
+  }
+}
 
 void downsample(int D,std::vector<float> input, std::vector<float> &down)
 {
@@ -26,12 +33,6 @@ void downsample(int D,std::vector<float> input, std::vector<float> &down)
 
 int main()
 {
-  std::cout << "test\n";
-	// binary files can be generated through the
-	// Python models from the "../model/" sub-folder
-	const std::string in_fname = "../data/samples0.raw";
-	std::vector<float> bin_data;
-	readBinData(in_fname, bin_data);
 
 	//change these with if statements based on modes
 	//currently mode 0
@@ -41,14 +42,6 @@ int main()
 	float audio_Fs = 48000, audio_Fc = 16000;
 	int audio_taps = 151, audio_decim = 5, audio_up = 0;
 
-	//IQ data from -1 to +1 in 32-bit format
-	std::vector<float> iq_data;
-	iq_data.resize(bin_data.size(), 0.0);
-	for(unsigned int i = 0; i < bin_data.size(); i++)
-	{
-			iq_data[i] = (bin_data[i] - 128.0)/128.0;
-	}
-  printRealVector(iq_data);
 	std::vector<float> rf_coeff;
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
 
@@ -70,30 +63,31 @@ int main()
 	std::vector<float> dummy_state;
 	std::vector<float> dummy_fm;
 	std::vector<float> filt_block;
-	std::vector<float> audio_data;
 
 	filt_block.resize(audio_coeff.size(), 0.0);
 	dummy_state.resize(2, 0.0);
 
 
-	while ((block_count+1)*block_size < iq_data.size())
-	{
-		// printf('Processing block %d\n',block_count);
+	for(unsigned int block_id = 0; ; block_id++) {
+		std::vector<float> block_data(block_size);
+    readStdinBlockData(block_size, block_data);
+    if ((std::cin.rdstate()) != 0) {
+      std::cerr << "End of input stream reached" << std::endl;
+      exit(1);
+    }
+    std::cerr << "Read block " << block_id << std::endl;
+
+
 		// i and q block convolution
-		std::vector<float>block_split_i;
-    std::vector<float>block_split_q;
+		std::vector<float>block_split_i = block_data;
+    std::vector<float>block_split_q = std::vector<float>(block_data.begin() + 1, block_data.end());
 		std::vector<float>block_split_down_i;
     std::vector<float>block_split_down_q;
-
-
-		block_split_i = std::vector<float>(iq_data.begin() + block_count*block_size, iq_data.begin() + (block_count + 1)*block_size);
-    block_split_q = std::vector<float>(iq_data.begin() + block_count*block_size + 1, iq_data.begin() + (block_count + 1)*block_size);
 
 		downsample(2, block_split_i, block_split_down_i);
     downsample(2, block_split_q, block_split_down_q);
 
 		state_block_conv(i_filt,block_split_down_i,rf_coeff,state_i_lpf_100k);
-
 		state_block_conv(q_filt,block_split_down_q,rf_coeff,state_q_lpf_100k);
 
 		//decimation
@@ -111,12 +105,18 @@ int main()
 
 		std::vector<float>audio_block;
 		downsample(audio_decim,audio_filt,audio_block);
-    std::cout << audio_filt.size() << "\n";
-    std::cout << audio_block.size() << "\n";
 
-		audio_data.insert(audio_data.end(), audio_block.begin(), audio_block.end());
-		block_count += 1;
+    std::vector<short int> audio_data;
+    for (unsigned int k = 0; k < audio_block.size(); k++) {
+      if(std::isnan(audio_block[k])){
+        audio_data.push_back(0);
+      }else{
+        audio_data.push_back(static_cast<short int>(audio_block[k] * 16384));
+      }
+    }
+    fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
 	}
+
   //printRealVector(audio_data);
 	const std::string out_fname = "../data/float32filtered.bin";
 	writeBinData(out_fname, audio_data);

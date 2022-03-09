@@ -64,7 +64,7 @@ int main()
 	std::vector<float> dummy_fm;
 	std::vector<float> filt_block;
 
-	filt_block.resize(audio_coeff.size(), 0.0);
+  filt_block.resize(audio_coeff.size(), 0.0);
 	dummy_state.resize(2, 0.0);
 
 
@@ -79,16 +79,16 @@ int main()
 
 
 		// i and q block convolution
-		std::vector<float>block_split_i = block_data;
-    std::vector<float>block_split_q = std::vector<float>(block_data.begin() + 1, block_data.end());
-		std::vector<float>block_split_down_i;
-    std::vector<float>block_split_down_q;
+		std::vector<float> block_split_i(block_size);
+    std::vector<float> block_split_q(block_size);
 
-		downsample(2, block_split_i, block_split_down_i);
-    downsample(2, block_split_q, block_split_down_q);
+		for (int k = 0; k < block_size / 2; k++) {
+      block_split_i[k] = block_data[2*k];
+      block_split_q[k] = block_data[2*k + 1];
+    }
 
-		state_block_conv(i_filt,block_split_down_i,rf_coeff,state_i_lpf_100k);
-		state_block_conv(q_filt,block_split_down_q,rf_coeff,state_q_lpf_100k);
+		state_block_conv(i_filt,block_split_i,rf_coeff,state_i_lpf_100k);
+		state_block_conv(q_filt,block_split_q,rf_coeff,state_q_lpf_100k);
 
 		//decimation
 		std::vector<float>i_ds;
@@ -117,7 +117,7 @@ int main()
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
 	}
 
-  //printRealVector(audio_data);
+  /*//printRealVector(audio_data);
 	const std::string out_fname = "../data/float32filtered.bin";
 	writeBinData(out_fname, audio_data);
 
@@ -171,7 +171,7 @@ int main()
 	// for additional analysis or alternative forms of visualization
 
 	// naturally, you can comment the line below once you are comfortable to run GNU plot
-	std::cout << "Run: gnuplot -e 'set terminal png size 1024,768' ../data/example.gnuplot > ../data/example.png\n";
+	std::cout << "Run: gnuplot -e 'set terminal png size 1024,768' ../data/example.gnuplot > ../data/example.png\n";*/
 
 	return 0;
 }

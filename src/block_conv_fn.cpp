@@ -55,7 +55,7 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 
 	// the rest of the code in this function is to be completed by you
 	// based on your understanding and the Python code from the first lab
-	for (unsigned int i = 0; i < num_taps; i++){
+	for (int i = 0; i < num_taps; i++){
 			if ((int) i == (num_taps-1)/2)
 				h[i] = norm_co;
 			else
@@ -82,7 +82,7 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
     }
   }
 
-  int index = x.size() - h.size();
+  int index = x.size() - h.size() + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 
 }

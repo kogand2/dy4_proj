@@ -16,7 +16,7 @@ Ontario, Canada
 #include "block_conv_fn.h"
 
 void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
-  std::vector<int> raw_data(num_samples);
+  std::vector<char> raw_data(num_samples);
   std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
   for(int k = 0; k < (int)num_samples; k++) {
     block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
@@ -77,7 +77,6 @@ int main()
     }
     std::cerr << "Read block " << block_id << std::endl;
 
-
 		// i and q block convolution
 		std::vector<float> block_split_i(block_size / 2);
     std::vector<float> block_split_q(block_size / 2);
@@ -86,10 +85,10 @@ int main()
       block_split_i[k] = block_data[2*k];
       block_split_q[k] = block_data[2*k + 1];
     }
-    printRealVector(block_split_i);
+
 		state_block_conv(i_filt,block_split_i,rf_coeff,state_i_lpf_100k);
 		state_block_conv(q_filt,block_split_q,rf_coeff,state_q_lpf_100k);
-    //printRealVector(i_filt);
+
 		//decimation
 		std::vector<float>i_ds;
 		std::vector<float>q_ds;
@@ -108,7 +107,6 @@ int main()
 
     std::vector<short int> audio_data;
 
-    break;
     for (unsigned int k = 0; k < audio_block.size(); k++) {
       if(std::isnan(audio_block[k])){
         audio_data.push_back(0);

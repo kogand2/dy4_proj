@@ -19,6 +19,6 @@ void readStdinBlockData(unsigned int, std::vector<float> &);
 
 void downsample(int, std::vector<float>, std::vector<float> &);
 
-void mono_path(int);
+std::vector<float> mono_path(std::vector<float> , std::vector<float> , std::vector<float> &, int);
 
 #endif // DY4_MONO_H

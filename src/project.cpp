@@ -16,7 +16,7 @@ Ontario, Canada
 #include "block_conv_fn.h"
 #include "mono_path.h"
 
-std::vector<float> mono_path(std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> audio_state, int audio_decim){
+std::vector<float> mono_path(std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim){
   // filter out audio data with convolution
   std::vector<float> audio_filt;
   state_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state);

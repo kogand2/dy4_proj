@@ -29,7 +29,7 @@ void process_block_stream(int mode){
   switch(mode) {
     case 0:
       rf_Fs = 2400000.0;
-      rf_decim = 4;
+      rf_decim = 10;
       audio_exp = 0;
       audio_decim = 5;
       break;
@@ -55,7 +55,7 @@ void process_block_stream(int mode){
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 16;
+	int rf_taps = 151;
 
   // audio path variables
 	float audio_Fc = 16000;
@@ -106,7 +106,7 @@ void process_block_stream(int mode){
 
       exit(1);
     }
-    //std::cerr << "Read block " << block_id << std::endl;
+    std::cerr << "Read block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
 		std::vector<float> i_data(block_size / 2);
@@ -124,16 +124,9 @@ void process_block_stream(int mode){
 		rf_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
 		rf_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
 
-    break;
-
-    printRealVector(i_filt);
-    std::cout << "\n";
-
     // other version
-    state_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k);
-		state_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k);
-
-    break;
+    //state_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k);
+		//state_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k);
 
 		// downsample filtered IQ data
 		std::vector<float>i_ds;
@@ -144,14 +137,8 @@ void process_block_stream(int mode){
 		downsample(rf_decim,i_filt,i_ds);
 		downsample(rf_decim,q_filt,q_ds);
 
-    std::cout << "\n";
-    printRealVector(i_ds);
-
-    break;
-
-
 		// perform demodulation on IQ data
-		IQ_demod = fmDemod(i_filt, q_filt, demod_state);
+		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
 
 		// STEP 2: Mono path
     std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);

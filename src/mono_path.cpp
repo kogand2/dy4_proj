@@ -108,7 +108,7 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   else{
   // filter out audio data with convolution
   std::vector<float> audio_filt;
-  state_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state);
+  rf_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim);
 
   // downsample filtered audio data
   std::vector<float> audio_block;

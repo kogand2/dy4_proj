@@ -119,10 +119,10 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
-        std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n - k << "]\n";
+        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n - k << "]\n";
 			}else{
 				y[n] += h[k] * state[state.size() + n - k];
-        std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  n - k << "]\n";
+        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  n - k << "]\n";
       }
     }
   }
@@ -137,18 +137,18 @@ void rf_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 {
 	// allocate memory for the output (filtered) data
 	y.clear();
-	y.resize(x.size()/rf_decim, 0.0); // y of size i_data/D
+	y.resize(x.size(), 0.0); // y of size i_data/D
 
   // implement block processing algorithm discussed in lecture and used in python
-	for (int n = 0; n < y.size(); n++){
+	for (int n = 0; n < y.size(); n += rf_decim){
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
-				y[n] += h[k] * x[n*rf_decim - k];
-        std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n*rf_decim - k << "]\n";
+				y[n] += h[k] * x[n - k];
+        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n*rf_decim - k << "]\n";
 			}
       else{
-				y[n] += h[k] * state[state.size() + n*rf_decim - k];
-        std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  (n-k)*rf_decim << "]\n";
+				y[n] += h[k] * state[state.size() + n - k];
+        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() + (n-k) << "]\n";
       }
     }
   }

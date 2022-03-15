@@ -103,10 +103,10 @@ void process_block_stream(int mode){
 		  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
 
 		  std::cerr << DFT_run_time.count() << " milliseconds" << "\n";
-
+      std::cerr << "USE THIS COMMAND TO PLAY IT: \n";
+      std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 48000 \n";
       exit(1);
     }
-    std::cerr << "Read block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
 		std::vector<float> i_data(block_size / 2);
@@ -118,17 +118,10 @@ void process_block_stream(int mode){
     }
 
     // filter out IQ data with convolution
-    // COULD BE FASTER, JUST DO CONVOLUTION ON DOWNSAMPLED VALUES?
-    // MAYBE COMBINE LPF AND DOWNSAMPLING FUNCTION INTO ONE FUNCTION
-    // TO DO BOTH OPERATIONS IN SINGLE PASS ?
-		rf_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
-		rf_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
+		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
+		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
 
-    // other version
-    //state_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k);
-		//state_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k);
-
-		// downsample filtered IQ data
+		// take downsampled filtered IQ data
 		std::vector<float>i_ds;
     i_ds.resize(i_filt.size()/rf_decim);
 		std::vector<float>q_ds;
@@ -149,7 +142,8 @@ void process_block_stream(int mode){
     for (unsigned int k = 0; k < audio_block.size(); k++) {
       if(std::isnan(audio_block[k])){
         audio_data.push_back(0);
-      }else{
+      }
+      else{
         audio_data.push_back(static_cast<short int>(audio_block[k] * 16384));
       }
     }

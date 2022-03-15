@@ -133,22 +133,20 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 }
 
 // block convolution function for RF (with downsampling)
-void rf_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim)
+void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim)
 {
 	// allocate memory for the output (filtered) data
 	y.clear();
-	y.resize(x.size(), 0.0); // y of size i_data/D
+	y.resize(x.size(), 0.0); // y of size i_data
 
-  // implement block processing algorithm discussed in lecture and used in python
+  // only compute the values we need (because of downsampling)
 	for (int n = 0; n < y.size(); n += rf_decim){
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n*rf_decim - k << "]\n";
-			}
+      }
       else{
 				y[n] += h[k] * state[state.size() + n - k];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() + (n-k) << "]\n";
       }
     }
   }

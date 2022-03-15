@@ -24,7 +24,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   I_new.insert( I_new.end(), I.begin(), I.end() );
   Q_new.insert( Q_new.end(), Q.begin(), Q.end() );
 
-  for (unsigned int j = 0; j < I.size(); j++){
+  for (int j = 0; j < I.size(); j++){
     Q_der = Q_new[j+1] - Q_new[j];
     I_der = I_new[j+1] - I_new[j];
 
@@ -57,14 +57,57 @@ void low_pass_coeff(float Fs, float Fc, unsigned short int num_taps, std::vector
 	// based on your understanding and the Python code from the first lab
 	for (int i = 0; i < num_taps; i++){
 			if ((int) i == (num_taps-1)/2)
-				h[i] = norm_co;
+		    h[i] = norm_co;
 			else
-				h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
+			  h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
 			h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
 	}
 }
 
 // Block convolution function
+/*void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
+{
+	// allocate memory for the output (filtered) data
+	y.clear();
+	y.resize(x.size(), 0.0);
+
+  // lead-in
+  for (int n = 0; n < h.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++){
+        if (n-k >= 0)
+          y[n] += h[k] * x[n-k];
+        else
+          y[n] += h[k] * state[state.size() + n - k];
+    }
+  }
+
+  // dominant partition
+  for (int n = h.size(); n < x.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++)
+    {
+        y[n] += h[k] * x[n-k];
+    }
+  }
+
+  // lead out
+  for (int n = x.size(); n < y.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++)
+    {
+      if (n-k < x.size())
+        y[n] += h[k] * x[n-k];
+      else
+        y[n] += h[k] * state[state.size() + n - k];
+    }
+  }
+
+  int index = x.size() - h.size() + 1;
+	state = std::vector<float>(x.begin() + index, x.end());
+
+}*/
+
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {
 	// allocate memory for the output (filtered) data
@@ -76,8 +119,10 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
+        std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n - k << "]\n";
 			}else{
 				y[n] += h[k] * state[state.size() + n - k];
+        std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  n - k << "]\n";
       }
     }
   }
@@ -85,4 +130,29 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
   int index = x.size() - h.size() + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 
+}
+
+// block convolution function for RF (with downsampling)
+void rf_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim)
+{
+	// allocate memory for the output (filtered) data
+	y.clear();
+	y.resize(x.size()/rf_decim, 0.0); // y of size i_data/D
+
+  // implement block processing algorithm discussed in lecture and used in python
+	for (int n = 0; n < y.size(); n++){
+		for (int k = 0; k < h.size(); k++){
+			if (n-k >= 0){
+				y[n] += h[k] * x[n*rf_decim - k];
+        std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n*rf_decim - k << "]\n";
+			}
+      else{
+				y[n] += h[k] * state[state.size() + n*rf_decim - k];
+        std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  (n-k)*rf_decim << "]\n";
+      }
+    }
+  }
+
+  int index = x.size() - h.size() + 1;
+	state = std::vector<float>(x.begin() + index, x.end());
 }

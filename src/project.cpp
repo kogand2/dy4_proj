@@ -16,36 +16,50 @@ Ontario, Canada
 #include "block_conv_fn.h"
 #include "mono_path.h"
 
+// testing time complexity
+#include <chrono>
+
 void process_block_stream(int mode){
+  auto start_time = std::chrono::high_resolution_clock::now();
+
   // Determine custom parameters depending on mode
   float rf_Fs;
-  int rf_decim, audio_decim;
+  int rf_decim, audio_decim, audio_exp;
+
   switch(mode) {
     case 0:
       rf_Fs = 2400000.0;
-      rf_decim = 10;
+      rf_decim = 4;
+      audio_exp = 0;
       audio_decim = 5;
       break;
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
+      audio_exp = 0;
       audio_decim = 6;
       break;
     case 2:
       rf_Fs = 2400000.0;
+      rf_decim = 10;
+      audio_exp = 147;
+      audio_decim = 800;
       break;
     case 3:
       rf_Fs = 2304000.0;
+      rf_decim = 9;
+      audio_exp = 147;
+      audio_decim = 0;
       break;
   }
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 151, rf_up = 0;
+	int rf_taps = 16;
 
   // audio path variables
 	float audio_Fc = 16000;
-	int audio_taps = 151, audio_up = 0;
+	int audio_taps = 151;
 
   // RF LPF filter coefficients
 	std::vector<float> rf_coeff;
@@ -84,9 +98,15 @@ void process_block_stream(int mode){
     readStdinBlockData(block_size, block_data);
     if ((std::cin.rdstate()) != 0) {
       std::cerr << "End of input stream reached" << std::endl;
+
+      auto stop_time = std::chrono::high_resolution_clock::now();
+		  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
+
+		  std::cerr << DFT_run_time.count() << " milliseconds" << "\n";
+
       exit(1);
     }
-    std::cerr << "Read block " << block_id << std::endl;
+    //std::cerr << "Read block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
 		std::vector<float> i_data(block_size / 2);
@@ -98,21 +118,43 @@ void process_block_stream(int mode){
     }
 
     // filter out IQ data with convolution
-		state_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k);
+    // COULD BE FASTER, JUST DO CONVOLUTION ON DOWNSAMPLED VALUES?
+    // MAYBE COMBINE LPF AND DOWNSAMPLING FUNCTION INTO ONE FUNCTION
+    // TO DO BOTH OPERATIONS IN SINGLE PASS ?
+		rf_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
+		rf_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
+
+    break;
+
+    printRealVector(i_filt);
+    std::cout << "\n";
+
+    // other version
+    state_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k);
 		state_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k);
+
+    break;
 
 		// downsample filtered IQ data
 		std::vector<float>i_ds;
+    i_ds.resize(i_filt.size()/rf_decim);
 		std::vector<float>q_ds;
+    q_ds.resize(q_filt.size()/rf_decim);
 
 		downsample(rf_decim,i_filt,i_ds);
 		downsample(rf_decim,q_filt,q_ds);
 
+    std::cout << "\n";
+    printRealVector(i_ds);
+
+    break;
+
+
 		// perform demodulation on IQ data
-		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
+		IQ_demod = fmDemod(i_filt, q_filt, demod_state);
 
 		// STEP 2: Mono path
-    std::vector<float> audio_block = mono_path(IQ_demod, audio_coeff, audio_state, audio_decim);
+    std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 
     // STEP 3: prepare audio data for output
     std::vector<short int> audio_data;
@@ -132,15 +174,19 @@ int main(int argc, char* argv[])
 {
   int mode = 0;
 
+  // default operation
   if (argc < 2){
     std::cerr << "Operating in default mode 0" << std::endl;
-  }else if (argc == 2){
+  }
+  // mode operation
+  else if (argc == 2){
     mode = atoi(argv[1]);
     if (mode > 3){
-      std::cerr << "Wrong mode: " << mode << std::endl;
+      std::cerr << "Not a valid mode: " << mode << std::endl;
       exit(1);
     }
-  }else{
+  }
+  else{
     std::cerr << "Usage: " << argv[0] << std::endl;
     std::cerr << "or " << std::endl;
     std::cerr << "Usage: " << argv[0] << " <mode>" << std::endl;

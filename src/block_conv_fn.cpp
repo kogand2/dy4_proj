@@ -174,9 +174,9 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
         //std::cerr << "test4\n";
       }
       else{
-        std::cerr << "test5\n";
+        //std::cerr << "test5\n";
 				y[n] += audio_exp * h[k] * state[state.size() + x_index];
-        std::cerr << "test6\n";
+        //std::cerr << "test6\n";
       }
       x_index--;
     }

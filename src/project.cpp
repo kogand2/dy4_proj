@@ -65,20 +65,19 @@ void process_block_stream(int mode){
 	std::vector<float> rf_coeff;
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
 
+  // audio LPF filter coefficients
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
 	float block_size = 102400;
-	int block_count = 0;
 
   // filtered data
   std::vector<float> i_filt;
 	std::vector<float> q_filt;
-  std::vector<float> audio_filt;
 
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
-  audio_state.resize(audio_taps*audio_exp - 1, 0.0);
+  audio_state.resize(audio_coeff.size(), 0.0);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
@@ -98,16 +97,21 @@ void process_block_stream(int mode){
     if ((std::cin.rdstate()) != 0) {
       std::cerr << "End of input stream reached" << std::endl;
 
+      // timing analysis
       auto stop_time = std::chrono::high_resolution_clock::now();
 		  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-
 		  std::cerr << DFT_run_time.count() << " milliseconds" << "\n";
-      std::cerr << "USE THIS COMMAND TO PLAY IT: \n";
-      std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 48000 \n";
+
+      std::cerr << "Use the following command to play the audio: \n";
+      if (mode == 2 || mode == 3)
+        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 44100 \n";
+      else
+        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 48000 \n";
+
       exit(1);
     }
 
-    std::cerr << "Processing block " << block_id << std::endl;
+    //std::cerr << "Processing block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
 		std::vector<float> i_data(block_size / 2);
@@ -133,7 +137,7 @@ void process_block_stream(int mode){
 
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
-    std::cerr << "test1\n";
+    //std::cerr << "test1\n";
 		// STEP 2: Mono path
     std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 

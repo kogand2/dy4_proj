@@ -24,4 +24,6 @@ void state_block_conv(std::vector<float> &, const std::vector<float> &, const st
 
 void ds_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int);
 
+void rs_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int, int);
+
 #endif // DY4_BLOCKCONVFN_H

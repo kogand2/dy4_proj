@@ -1,3 +1,4 @@
+
 #include "dy4.h"
 #include "filter.h"
 #include "fourier.h"
@@ -20,8 +21,6 @@ void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data
 void downsample(int D, std::vector<float> input, std::vector<float> &down)
 {
     // clear downsampled array
-    // NOTE: THIS DESTROYS EVERYTHING IN VECTOR SO, THIS CAN BE FURTHER
-    // OPTIMIZED BY RESIZING VECTOR ONCE AGAIN BEFORE PUSHING INTO IT
     down.clear();
 
     for(int i = 0; i < input.size(); i = i + D)
@@ -35,67 +34,81 @@ void upsample (int U, std::vector<float> input, std::vector<float> &up)
 {
   // clear upsampled array
   up.clear();
-  up.resize(input.size()*U, 0.0);
 
-  int k = 0; // used to parse through input
-
-  // insert values in between each U - 1 zeros
-  for(int i = 0; i < up.size(); i += U)
+  // pad with U - 1 zeros
+  for(int i = 0; i < input.size(); i++)
   {
-    up[i] = input[k];
-    k++;
+    for(int j = 0; j < U; j++)
+      up.push_back(0);
   }
 }
 
-std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, int audio_decim, int audio_exp, float audio_Fc, float audio_Fs, int audio_taps){
+// convolution
+void mono_convolution(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
+{
+	// allocate memory for the output (filtered) data
+	y.clear();
+	y.resize(x.size(), 0.0);
+
+  // lead-in
+  for (int n = 0; n < h.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++){
+        if (n-k >= 0)
+          y[n] += h[k] * x[n-k];
+        else
+          y[n] += h[k] * state[state.size() + n - k];
+    }
+  }
+
+  // dominant partition
+  for (int n = h.size(); n < x.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++)
+    {
+        y[n] += h[k] * x[n-k];
+    }
+  }
+
+  // lead out
+  for (int n = x.size(); n < y.size(); n++)
+  {
+    for (int k = 0; k < h.size(); k++)
+    {
+      if (n-k < x.size())
+        y[n] += h[k] * x[n-k];
+      else
+        y[n] += h[k] * state[state.size() + n - k];
+    }
+  }
+
+  int index = x.size() - h.size() + 1;
+	state = std::vector<float>(x.begin() + index, x.end());
+}
+
+std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
+  std::vector<float> audio_filt;
+  std::vector<float> audio_block;
   if (mode == 2 || mode == 3)
   {
-    // upsample audio data
-    std::vector<float> audio_us;
-    audio_us.resize(IQ_demod.size()*audio_exp, 0.0);
-    upsample(audio_exp, IQ_demod, audio_us);
+    std::cerr << "test2\n";
+    rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 
-    // audio path LPF coefficients
-  	std::vector<float> audio_coeff;
-    int audio_Fs = (audio_exp*(audio_Fs/2))/audio_decim;
-  	low_pass_coeff(audio_Fs, audio_Fc, audio_taps, audio_coeff);
-
-    // state saving variable for audio data convolution
-    std::vector<float> audio_state;
-    audio_state.resize(audio_coeff.size(), 0.0);
-
-    // filter out audio data with convolution
-    std::vector<float> audio_filt;
-    ds_block_conv(audio_filt, audio_us, audio_coeff, audio_state, audio_decim);
-
-    // downsample filtered audio data
-    std::vector<float> audio_block;
+    // take downsampled filtered audio data
     audio_block.resize(audio_filt.size()/audio_decim);
+
     downsample(audio_decim, audio_filt, audio_block);
 
-    return audio_block;
   }
 
   else{
-    // no upsampling needed
-
-    // audio path LPF coefficients
-    std::vector<float> audio_coeff;
-    low_pass_coeff(audio_Fs, audio_Fc, audio_taps, audio_coeff);
-
-    // state saving variable for audio data convolution
-  	std::vector<float> audio_state;
-    audio_state.resize(audio_coeff.size(), 0.0);
-
     // filter out audio data with convolution
-    std::vector<float> audio_filt;
+    audio_state.resize(150, 0.0);
     ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim);
 
     // take downsampled filtered audio data
-    std::vector<float> audio_block;
     audio_block.resize(audio_filt.size()/audio_decim);
     downsample(audio_decim, audio_filt, audio_block);
-
-    return audio_block;
   }
+  return audio_block;
 }

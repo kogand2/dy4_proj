@@ -154,3 +154,34 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
   int index = x.size() - h.size() + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 }
+
+// block convolution function for RF (with resampling)
+void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp)
+{
+	// allocate memory for the output (filtered) data
+	y.clear();
+	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
+
+  // only compute the values we need (because of downsampling)
+	for (int n = 0; n < y.size(); n += audio_decim){
+    int phase = n % audio_exp;
+    int x_index = (n - phase) / audio_exp;
+
+		for (int k = phase; k < h.size(); k += audio_exp){
+			if (x_index >= 0){
+        //std::cerr << "test3\n";
+				y[n] += audio_exp * h[k] * x[x_index];
+        //std::cerr << "test4\n";
+      }
+      else{
+        std::cerr << "test5\n";
+				y[n] += audio_exp * h[k] * state[state.size() + x_index];
+        std::cerr << "test6\n";
+      }
+      x_index--;
+    }
+  }
+
+  int index = x.size() - h.size()/audio_exp + 1;
+	state = std::vector<float>(x.begin() + index, x.end());
+}

@@ -30,13 +30,13 @@ void process_block_stream(int mode){
     case 0:
       rf_Fs = 2400000.0;
       rf_decim = 10;
-      audio_exp = 0;
+      audio_exp = 1;
       audio_decim = 5;
       break;
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
-      audio_exp = 0;
+      audio_exp = 1;
       audio_decim = 6;
       break;
     case 2:
@@ -48,8 +48,8 @@ void process_block_stream(int mode){
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
-      audio_exp = 147;
-      audio_decim = 0;
+      audio_exp = 441;
+      audio_decim = 2560;
       break;
   }
 
@@ -60,17 +60,15 @@ void process_block_stream(int mode){
   // audio path variables
 	float audio_Fc = 16000;
 	int audio_taps = 151;
-  float audio_Fs = rf_Fs/rf_decim;
 
   // RF LPF filter coefficients
 	std::vector<float> rf_coeff;
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
 
-  // audio path LPF coefficients (ONLY FOR MODE 0 AND 1?)
-	//std::vector<float> audio_coeff;
-	//low_pass_coeff(rf_Fs/rf_decim, audio_Fc, audio_taps, audio_coeff);
+	std::vector<float> audio_coeff;
+	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-	float block_size = 1024*rf_decim*audio_decim*2;
+	float block_size = 102400;
 	int block_count = 0;
 
   // filtered data
@@ -78,9 +76,9 @@ void process_block_stream(int mode){
 	std::vector<float> q_filt;
   std::vector<float> audio_filt;
 
-  // state saving variable for audio data convolution (ONLY FOR MODE 0 AND 1?)
-	//std::vector<float> audio_state;
-  //audio_state.resize(audio_coeff.size(), 0.0);
+  // state saving variable for audio data convolution
+	std::vector<float> audio_state;
+  audio_state.resize(audio_taps*audio_exp - 1, 0.0);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
@@ -109,6 +107,8 @@ void process_block_stream(int mode){
       exit(1);
     }
 
+    std::cerr << "Processing block " << block_id << std::endl;
+
 		// STEP 1: IQ samples demodulation
 		std::vector<float> i_data(block_size / 2);
     std::vector<float> q_data(block_size / 2);
@@ -133,9 +133,9 @@ void process_block_stream(int mode){
 
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
-
+    std::cerr << "test1\n";
 		// STEP 2: Mono path
-    std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_decim, audio_exp, audio_Fc, audio_Fs, audio_taps);
+    std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 
     // STEP 3: prepare audio data for output
     std::vector<short int> audio_data;

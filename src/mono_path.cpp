@@ -32,12 +32,13 @@ void downsample(int D, std::vector<float> input, std::vector<float> &down)
 std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
   std::vector<float> audio_filt;
   std::vector<float> audio_block;
-  
+
   if (mode == 2 || mode == 3)
   {
     //std::cerr << "test2\n";
     // resample audio data
     rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
+
 
     // take downsampled filtered audio data
     audio_block.resize(audio_filt.size()/audio_decim);

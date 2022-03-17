@@ -178,13 +178,13 @@ if __name__ == "__main__":
 	# coefficients for the front-end low-pass filter
 	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
 
-	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs, audio_taps)
-	th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs)
+	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs/rf_decim, audio_taps)
+	th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs/rf_decim)
 
 	print(carrier_coeff)
 	print(th_coeff)
 
-	channel_coeff = myBandPass(22e3, 54e3, rf_Fs, audio_taps)
+	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps)
 
 	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps)
 

@@ -225,10 +225,9 @@ if __name__ == "__main__":
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
 	stereo_data = np.array([])# used to concatenate filtered blocks (stereo data)
 
-	# if the number of samples in the last block is less than the block size
-	# it is fine to ignore the last few samples from the raw IQ file
+
 	while (block_count+1)*block_size < len(iq_data):
-	#RF FRONT END
+	#RF FRONT END==================================================
 		# if you wish to have shorter runtimes while troubleshooting
 		# you can control the above loop exit condition as you see fit
 		print('Processing block ' + str(block_count))
@@ -245,55 +244,39 @@ if __name__ == "__main__":
 		i_ds = i_filt[::rf_decim]
 		q_ds = q_filt[::rf_decim]
 
-		print(type(i_ds))
-		# FM demodulator
-		# you will need to implement your own FM demodulation based on:
-		# https://www.embedded.com/dsp-tricks-frequency-demodulation-algorithms/
-		# see more comments on fmSupportLib.py - take particular notice that
 		# you MUST have also "custom" state-saving for your own FM demodulator
 		dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
-		#dummy_fm, state_phase = fmDemodArctan(i_ds, q_ds, prev_phase = state_phase)
 
-    #RF front end stops here
+    #RF front end stops here==================================================
 
-		# extract the mono audio data through filtering
+		# extract the stereo audio data
 
         #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
 		carrier_filt, carrier_block = block_convolution(th_coeff, dummy_fm, carrier_block)
-		#print(pll_block)a
-		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)		#Fs Frequencies over here could be wrong
+		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)
 
         #Stereo Channel Extraction: Bandpass
 		channel_filt,channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
 
         #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
-		mixedAudio = mixer(recoveredStereo, channel_filt)												#Possible mixer issue?
+		mixedAudio = mixer(recoveredStereo, channel_filt)
 
-		# downsample audio data
-		# to be updated by you during in-lab (same code for takehome)
 		mixed_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps)
 		stereo_filt,filt_block = block_convolution(mixed_coeff, mixedAudio, filt_block)
 
 		stereo_block = stereo_filt[::audio_decim]
 
-		# concatenate the most recently processed audio_block
-		# to the previous blocks stored already in audio_data
-		#
 		stereo_data = np.concatenate((stereo_data, stereo_block))
-		#
-		#MONO PATH
+
+
+		# extract the mono audio data
 		audio_filt,mono_block = block_convolution(audio_coeff, dummy_fm, mono_block)
 
-		# downsample audio data
-		# to be updated by you during in-lab (same code for takehome)
 		audio_block = audio_filt[::audio_decim]
 
-		# concatenate the most recently processed audio_block
-		# to the previous blocks stored already in audio_data
-		#
 		audio_data = np.concatenate((audio_data, audio_block))
 
-		#Proper format
+		#Alternate left and right data throuugh concatenation
 		complete_data = np.empty((len(stereo_data)))							#Concatenation of data this way may be incorrect
 		for i in range(len(complete_data)):
 			if(i%2 == 0):
@@ -301,10 +284,8 @@ if __name__ == "__main__":
 			else:
 				complete_data[1::2] = audio_data[i] - stereo_data[i]
 
-		# to save runtime select the range of blocks to log data
-		# this includes both saving binary files as well plotting PSD
-		# below we assume we want to plot for graphs for blocks 10 and 11
 
+		#Generate Plots of PLL
 		if block_count >= 8 and block_count < 10:
 			x1 = range(500)
 			x2 = range(500)

@@ -19,7 +19,7 @@ from fmSupportLib import fmDemodArctan, fmPlotPSD, myDemod
 # for take-home add your functions
 def myLowPass(fc, fs, Ntaps):
 	normCutoff = fc/(fs/2)
-	h = [0]*Ntaps
+	h = np.zeros(Ntaps)
 	for i in range(Ntaps):
 		if (i==(Ntaps-1)/2):
 			h[i] = normCutoff
@@ -32,15 +32,15 @@ def myLowPass(fc, fs, Ntaps):
 def myBandPass(fb, fe, fs, Ntaps):
 	normCenter = ((fe + fb)/2)/(fs/2)
 	normPass = (fe - fb)/(fs/2)
-	h = [0]*Ntaps
+	h = np.zeros(Ntaps)
 
 	for i in range(Ntaps):
 		if (i==(Ntaps-1)/2):
 			h[i] = normPass # avoid division by zero in sinc for the center tap when Ntaps is odd
 		else:
-			h[i] = normPass*(math.sin(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))/(np.pi*(normPass/2)*(i-(Ntaps-1)/2))
+			h[i] = normPass*((math.sin(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))/(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))
 		h[i] = h[i]*(math.cos(i*np.pi*normCenter))
-		h[i] = h[i]*(math.sin(i*np.pi/Ntaps))**2
+		h[i] = h[i]*((math.sin(i*np.pi/Ntaps))**2)
 
 	return  h
 
@@ -61,7 +61,7 @@ def block_convolution(h, xb, state):
 
 	return yb, new_state
 
-def fmPll(pllIn, freq, Fs, ncoScale = 1.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):
+def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):
 
 	"""
 	pllIn 	 		array of floats
@@ -143,10 +143,10 @@ def fmPll(pllIn, freq, Fs, ncoScale = 1.0, phaseAdjust = 0.0, normBandwidth = 0.
 	return ncoOut, new_state
 	# for RDS add also the quadrature NCO component to the output
 
-def mixer(recoveredStereo, channel_filt):
+def mixer(recoveredStereo, channel_filt): #Possible issues over here
 	mixedAudio = np.empty(len(channel_filt))
 	for i in range(len(channel_filt)):
-		mixedAudio[i] = math.cos(recoveredStereo[i])*math.cos(channel_filt[i])		#this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
+		mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i]	#this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
 																					#could prob automatically be done using the filter code from mono (???)
 	return mixedAudio
 
@@ -178,15 +178,24 @@ if __name__ == "__main__":
 	# coefficients for the front-end low-pass filter
 	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
 
-	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs/rf_decim, audio_taps)
+	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs/rf_decim, audio_taps) #For Stereo Carrier Recovery
 	th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs/rf_decim)
 
-	print(carrier_coeff)
-	print(th_coeff)
+	print(carrier_coeff)																				#Values not the same
+	print((th_coeff))
 
-	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps)
 
-	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps)
+	x1 = range(151)
+	x2 = range(151)
+	fig2, axs = plt.subplots(2)
+	fig2.suptitle('Coeff Checking')
+	axs[0].plot(x1, carrier_coeff)
+	axs[1].plot(x2, th_coeff)
+	plt.show()
+
+	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
+
+	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
 
 	# set up the subfigures for plotting
 	subfig_height = np.array([0.8, 2, 2, 1.6]) # relative heights of the subfigures
@@ -204,22 +213,22 @@ if __name__ == "__main__":
 	state_q_lpf_100k = np.zeros(rf_taps-1)
 	state_phase = 0
 
-	dummy_state = np.array([0,0])
-	filt_block = np.zeros(shape=len(carrier_coeff))
-	carrier_block = np.zeros(shape=len(carrier_coeff))
-	channel_block = np.zeros(shape=len(channel_coeff))
-	mono_block = np.zeros(shape=len(audio_coeff))
+	dummy_state = np.array([0,0])						#For RF Demondulation
+	filt_block = np.zeros(shape=len(carrier_coeff))		#For Stereo Processing
+	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Stereo Carrier Recovery
+	channel_block = np.zeros(shape=len(channel_coeff))	#For Stereo Channel Extraction
+	mono_block = np.zeros(shape=len(audio_coeff))		#For Monopath
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
-	stereo_data = np.array([])
+	stereo_data = np.array([])# used to concatenate filtered blocks (stereo data)
 
 	# if the number of samples in the last block is less than the block size
 	# it is fine to ignore the last few samples from the raw IQ file
 	while (block_count+1)*block_size < len(iq_data):
-
+	#RF FRONT END
 		# if you wish to have shorter runtimes while troubleshooting
 		# you can control the above loop exit condition as you see fit
 		print('Processing block ' + str(block_count))
@@ -245,20 +254,20 @@ if __name__ == "__main__":
 		dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
 		#dummy_fm, state_phase = fmDemodArctan(i_ds, q_ds, prev_phase = state_phase)
 
-        #RF front end stops here
+    #RF front end stops here
 
 		# extract the mono audio data through filtering
 
         #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
-		carrier_filt, carrier_block = block_convolution(carrier_coeff, dummy_fm, carrier_block)
-		print(pll_block)
-		recoveredStereo, pll_block = fmPll(carrier_filt, 240e3, rf_Fs, 1.0, 0.0, 0.01, pll_block)
+		carrier_filt, carrier_block = block_convolution(th_coeff, dummy_fm, carrier_block)
+		#print(pll_block)a
+		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)		#Fs Frequencies over here could be wrong
 
         #Stereo Channel Extraction: Bandpass
 		channel_filt,channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
 
         #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
-		mixedAudio = mixer(recoveredStereo, channel_filt)
+		mixedAudio = mixer(recoveredStereo, channel_filt)												#Possible mixer issue?
 
 		# downsample audio data
 		# to be updated by you during in-lab (same code for takehome)
@@ -284,21 +293,25 @@ if __name__ == "__main__":
 		#
 		audio_data = np.concatenate((audio_data, audio_block))
 
-		complete_data = np.empty((len(audio_data)+len(stereo_data)))
-		complete_data[::2] = np.add(audio_data, stereo_data)
-		complete_data[1::2] = np.subtract(audio_data, stereo_data)
+		#Proper format
+		complete_data = np.empty((len(stereo_data)))							#Concatenation of data this way may be incorrect
+		for i in range(len(complete_data)):
+			if(i%2 == 0):
+				complete_data[i] = audio_data[i] + stereo_data[i]
+			else:
+				complete_data[1::2] = audio_data[i] - stereo_data[i]
 
 		# to save runtime select the range of blocks to log data
 		# this includes both saving binary files as well plotting PSD
 		# below we assume we want to plot for graphs for blocks 10 and 11
 
 		if block_count >= 8 and block_count < 10:
-			x1 = range(5121)
-			x2 = range(5120)
+			x1 = range(500)
+			x2 = range(500)
 			fig2, axs = plt.subplots(2)
 			fig2.suptitle('PLL Checking')
-			axs[0].plot(x1, recoveredStereo)
-			axs[1].plot(x2, carrier_filt)
+			axs[0].plot(x1, recoveredStereo[:500])
+			axs[1].plot(x2, carrier_filt[:500])
 			plt.show()
 
 		if block_count >= 10 and block_count < 12:

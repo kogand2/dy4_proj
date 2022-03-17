@@ -31,7 +31,7 @@ import math, cmath
 # IQ samples; then unwrap the phase and take its derivative to demodulate
 #
 
-def fmDemodArctan(I, Q, prev_phase = 0.0):
+def fmDemodArctan(I, Q, prev_phase = 0):
 #
 # the default prev_phase phase is assumed to be zero, however
 # take note in block processing it must be explicitly controlled
@@ -62,7 +62,33 @@ def fmDemodArctan(I, Q, prev_phase = 0.0):
 	# (the last phase is needed to enable continuity for block processing)
 	return fm_demod, prev_phase
 
+def myDemod(I, Q, dummy_state):
+	fm_demod = np.empty(len(I)) #demodulated samples
+	#insert prvious values into I and Q
+	I_slice,Q_slice = np.split(dummy_state, 2)
+
+	newI = np.concatenate((I_slice,I)) #Adds previous two values from the last block to array
+	newQ = np.concatenate((Q_slice,Q)) #Adds previous two values from the last block to array
+
+	for j in range(len(I)):
+		#j + 2 is current value
+		#j + 1 is the the previous value one index before the current values
+		#j is the the previous value two indexs before the current values
+
+		#Calculate the derivatives of I and Q then find the difference between them
+		derQ = (newQ[j+1] - newQ[j])
+		derI = (newI[j+1] - newI[j])
+		fm_demod[j] = derQ*newI[j+1] - derI*newQ[j+1]
+		#Scaling operation
+		if ((newQ[j+1]**2 + newI[j+1]**2) != 0):
+			fm_demod[j] = fm_demod[j]/(newQ[j+1]**2 + newI[j+1]**2)
+		else:
+			fm_demod[j] = 0
+	dummy_state = np.array([I[5119],Q[5119]])
+	#print(dummy_state)
+	return fm_demod, dummy_state
 # custom function for DFT that can be used by the PSD estimate
+
 def DFT(x):
 
 	# number of samples
@@ -100,7 +126,7 @@ def estimatePSD(samples, NFFT, Fs):
 	hann = np.empty(freq_bins)
 	for i in range(len(hann)):
 		hann[i] = pow(math.sin(i*math.pi/freq_bins),2)
-
+		#print(hann[i])
 	# create an empty list where the PSD for each segment is computed
 	psd_list = []
 
@@ -116,24 +142,29 @@ def estimatePSD(samples, NFFT, Fs):
 		# apply the hann window (using pointwise multiplication)
 		# before computing the Fourier transform on a segment
 		windowed_samples = samples[k*freq_bins:(k+1)*freq_bins] * hann
-
+		#print(windowed_samples)
 		# compute the Fourier transform using the built-in FFT from numpy
 		Xf = np.fft.fft(windowed_samples, freq_bins)
 
 		# note, you can check how MUCH slower is DFT vs FFT by replacing the
 		# above function call with the one that is commented below
 		#
-		# Xf = DFT(windowed_samples)
+		#Xf = DFT(windowed_samples)
+
 		#
 		# note: the slow impelementation of the Fourier transform is not as
 		# critical when computing a static power spectra when troubleshooting
 		#
 		# note also: time permitting a custom FFT can be implemented
 
+
 		# since input is real, we keep only the positive half of the spectrum
 		# however, we will also add the signal energy of negative frequencies
 		# to have a better a more accurate PSD estimate when plotting
 		Xf = Xf[0:int(freq_bins/2)] # keep only positive freq bins
+		#print(Xf)
+		#print(freq_bins/2)
+		#print(len(Xf))
 		psd_seg = (1/(Fs*freq_bins/2)) * (abs(Xf)**2) # compute signal power
 		psd_seg = 2*psd_seg # add the energy from the negative freq bins
 
@@ -141,10 +172,11 @@ def estimatePSD(samples, NFFT, Fs):
 		for i in range(len(psd_seg)):
 			psd_seg[i] = 10*math.log10(psd_seg[i])
 
+
 		# append to the list where PSD for each segment is stored
 		# in sequential order (first segment, followed by the second one, ...)
 		psd_list.extend(psd_seg)
-
+		#print(k)
 	# compute the estimate to be returned by the function through averaging
 	psd_est = np.zeros(int(freq_bins/2))
 
@@ -194,4 +226,5 @@ def fmPlotPSD(ax, samples, Fs, height, title):
 if __name__ == "__main__":
 
 	# do nothing when this module is launched on its own
+
 	pass

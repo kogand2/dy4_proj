@@ -77,13 +77,13 @@ void process_block_stream(int mode){
 
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
-  audio_state.resize(audio_coeff.size(), 0.0);
+  audio_state.resize(audio_coeff.size() - 1, 0.0);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
 	std::vector<float> state_q_lpf_100k;
-	state_i_lpf_100k.resize(rf_taps - 1, 0.0);
-	state_q_lpf_100k.resize(rf_taps - 1, 0.0);
+	state_i_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
+	state_q_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
 
   // demodulation variables
 	std::vector<float> demod_state;

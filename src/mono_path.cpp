@@ -35,10 +35,8 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
 
   if (mode == 2 || mode == 3)
   {
-    //std::cerr << "test2\n";
     // resample audio data
     rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
-
 
     // take downsampled filtered audio data
     audio_block.resize(audio_filt.size()/audio_decim);

@@ -18,7 +18,7 @@ Ontario, Canada
 // declaration of a function prototypes
 std::vector<float> fmDemod(std::vector<float>, std::vector<float>, std::vector<float> &);
 
-void low_pass_coeff(float, float, unsigned int, std::vector<float> &);
+void low_pass_coeff(float, float, int, std::vector<float> &);
 
 void state_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &);
 

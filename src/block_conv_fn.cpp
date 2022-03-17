@@ -12,8 +12,9 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   float Q_prev;
   float I_der;
   float Q_der;
+  int j;
 
-  fm_demod.resize(I.size(), float(0));
+  fm_demod.resize(I.size() - 1, float(0));
 
   I_prev = dummy_state[0];
   Q_prev = dummy_state[1];
@@ -24,7 +25,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   I_new.insert( I_new.end(), I.begin(), I.end() );
   Q_new.insert( Q_new.end(), Q.begin(), Q.end() );
 
-  for (int j = 0; j < I.size(); j++){
+  for (j = 0; j < I.size() - 1; j++){
     Q_der = Q_new[j+1] - Q_new[j];
     I_der = I_new[j+1] - I_new[j];
 
@@ -38,14 +39,15 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   }
 
   dummy_state.clear();
-  dummy_state[0] = I[5119];
-  dummy_state[1] = Q[5119];
+  
+  dummy_state[0] = I[j];
+  dummy_state[1] = Q[j];
 
   return fm_demod;
 }
 
 // Filter coefficient function
-void low_pass_coeff(float Fs, float Fc, unsigned int num_taps, std::vector<float> &h)
+void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 {
 	// allocate memory for the impulse response
 	h.clear();
@@ -169,15 +171,10 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
-        //std::cerr << "test3\n";
 				y[n] += audio_exp * h[k] * x[x_index];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << x_index << "]\n";
-        //std::cerr << "test4\n";
       }
       else{
-        //std::cerr << "test5\n";
 				y[n] += audio_exp * h[k] * state[state.size() + x_index];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  x_index << "]\n";
       }
       x_index--;
     }

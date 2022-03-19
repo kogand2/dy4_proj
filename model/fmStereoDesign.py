@@ -40,7 +40,7 @@ def myBandPass(fb, fe, fs, Ntaps):
 		else:
 			h[i] = normPass*((math.sin(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))/(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))
 		h[i] = h[i]*(math.cos(i*np.pi*normCenter))
-		h[i] = h[i]*((math.sin(i*np.pi/Ntaps))**2)
+		h[i] = 2.5*h[i]*((math.sin(i*np.pi/Ntaps))**2)
 
 	return  h
 
@@ -179,19 +179,20 @@ if __name__ == "__main__":
 	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
 
 	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs/rf_decim, audio_taps) #For Stereo Carrier Recovery
-	th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs/rf_decim)
 
-	print(carrier_coeff)																				#Values not the same
-	print((th_coeff))
+	#th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs/rf_decim) #For testing
 
+	#carrier_coeff1 = myLowPass(18.5e3, rf_Fs/rf_decim, audio_taps) #For mono path combination #For testing
+	#carrier_coeff2 = myLowPass(19.5e3, rf_Fs/rf_decim, audio_taps) #For mono path combination
+	#Low_Carrier_Coeff = np.subtract(carrier_coeff2,carrier_coeff1)
 
-	x1 = range(151)
-	x2 = range(151)
-	fig2, axs = plt.subplots(2)
-	fig2.suptitle('Coeff Checking')
-	axs[0].plot(x1, carrier_coeff)
-	axs[1].plot(x2, th_coeff)
-	plt.show()
+	#x1 = range(151)
+	#fig2, axs = plt.subplots(3)
+	#fig2.suptitle('Coeff Checking')
+	#axs[0].plot(x1, carrier_coeff)
+	#axs[1].plot(x1, th_coeff)
+	#axs[2].plot(x1, Low_Carrier_Coeff)
+	#plt.show()
 
 	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
 
@@ -218,12 +219,14 @@ if __name__ == "__main__":
 	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Stereo Carrier Recovery
 	channel_block = np.zeros(shape=len(channel_coeff))	#For Stereo Channel Extraction
 	mono_block = np.zeros(shape=len(audio_coeff))		#For Monopath
+	complete_block = np.zeros(shape=len(audio_coeff))		#For Complete audio
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
 	stereo_data = np.array([])# used to concatenate filtered blocks (stereo data)
+	complete_data = np.array([]) #used to concatenate filtered blocks (complete data)
 
 
 	while (block_count+1)*block_size < len(iq_data):
@@ -252,8 +255,8 @@ if __name__ == "__main__":
 		# extract the stereo audio data
 
         #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
-		carrier_filt, carrier_block = block_convolution(th_coeff, dummy_fm, carrier_block)
-		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)
+		carrier_filt, carrier_block = block_convolution(carrier_coeff, dummy_fm, carrier_block)
+		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, audio_Fs, 2.0, 0.0, 0.01, pll_block)
 
         #Stereo Channel Extraction: Bandpass
 		channel_filt,channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
@@ -266,24 +269,20 @@ if __name__ == "__main__":
 
 		stereo_block = stereo_filt[::audio_decim]
 
-		stereo_data = np.concatenate((stereo_data, stereo_block))
-
-
 		# extract the mono audio data
 		audio_filt,mono_block = block_convolution(audio_coeff, dummy_fm, mono_block)
 
 		audio_block = audio_filt[::audio_decim]
 
-		audio_data = np.concatenate((audio_data, audio_block))
-
-		#Alternate left and right data throuugh concatenation
-		complete_data = np.empty((len(stereo_data)))							#Concatenation of data this way may be incorrect
-		for i in range(len(complete_data)):
+		complete_block = np.zeros(shape=len(audio_block))
+		for i in range(len(audio_block)):
 			if(i%2 == 0):
-				complete_data[i] = audio_data[i] + stereo_data[i]
+				complete_block[i] = audio_block[i] + stereo_block[i]
 			else:
-				complete_data[1::2] = audio_data[i] - stereo_data[i]
+				complete_block[i] = audio_block[i] - stereo_block[i]
+		#print(complete_block)
 
+		complete_data = np.concatenate((complete_data, complete_block))
 
 		#Generate Plots of PLL
 		if block_count >= 8 and block_count < 10:

@@ -24,6 +24,7 @@ void downsample(int D, std::vector<float> input, std::vector<float> &down)
 {
     // clear downsampled array
     down.clear();
+    //down.resize(input.size()/D, 0.0);
 
     for(int i = 0; i < input.size(); i = i + D)
     {
@@ -39,7 +40,8 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   {
     // resample audio data
     //auto start_time = std::chrono::high_resolution_clock::now();
-    rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
+    audio_block.resize(audio_filt.size()/audio_decim);
+    rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
 
     // timing analysis
     /*auto stop_time = std::chrono::high_resolution_clock::now();
@@ -47,8 +49,7 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
     std::cerr << "MONO RESAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
     */
     // take downsampled filtered audio data
-    audio_block.resize(audio_filt.size()/audio_decim);
-    downsample(audio_decim, audio_filt, audio_block);
+    //downsample(audio_decim, audio_filt, audio_block);
   }
 
   else{

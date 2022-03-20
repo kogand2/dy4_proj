@@ -61,11 +61,11 @@ void process_block_stream(int mode){
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 151;
+	int rf_taps = 51;
 
   // audio path variables
 	float audio_Fc = 16000;
-	int audio_taps = 151;
+	int audio_taps = 51;
 
   // RF LPF filter coefficients
 	std::vector<float> rf_coeff;
@@ -75,7 +75,7 @@ void process_block_stream(int mode){
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-	float block_size = 102400;
+	float block_size = 1024*audio_decim;
 
   // filtered data
   std::vector<float> i_filt;

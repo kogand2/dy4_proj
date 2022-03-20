@@ -53,12 +53,12 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 	h.clear();
 	h.resize(num_taps, 0.0);
 
-	auto norm_co = Fc/(Fs/2);
+	float norm_co = Fc/(Fs/2);
 
 	// the rest of the code in this function is to be completed by you
 	// based on your understanding and the Python code from the first lab
 	for (int i = 0; i < num_taps; i++){
-			if ((int) i == (num_taps-1)/2)
+			if (i == (num_taps-1)/2)
 		    h[i] = norm_co;
 			else
 			  h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
@@ -90,7 +90,7 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 
 }
 
-// block convolution function for RF (with downsampling)
+// block convolution function (with downsampling)
 void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim)
 {
 	// allocate memory for the output (filtered) data
@@ -113,13 +113,14 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 	state = std::vector<float>(x.begin() + index, x.end());
 }
 
-// block convolution function for RF (with resampling)
-void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp)
+// block convolution function (with resampling)
+void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
 	y.clear();
 	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
 
+  down.clear();
   // only compute the values we need (because of downsampling)
 	for (int n = 0; n < y.size(); n += audio_decim){
     int phase = n % audio_exp;
@@ -134,6 +135,8 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
       }
       x_index--;
     }
+    
+    down.push_back(y[n]);
   }
 
   int index = x.size() - h.size()/audio_exp + 1;

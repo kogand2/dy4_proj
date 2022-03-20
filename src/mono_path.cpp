@@ -55,16 +55,14 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   else{
     // filter out audio data with convolution
     //auto start_time = std::chrono::high_resolution_clock::now();
-    ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim);
+    audio_block.resize(audio_filt.size()/audio_decim);
+    ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
 
     // timing analysis
     /*auto stop_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
     std::cerr << "MONO DOWNSAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
     */
-    // take downsampled filtered audio data
-    audio_block.resize(audio_filt.size()/audio_decim);
-    downsample(audio_decim, audio_filt, audio_block);
   }
 
   return audio_block;

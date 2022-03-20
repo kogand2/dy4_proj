@@ -125,23 +125,18 @@ void process_block_stream(int mode){
 
     // filter out IQ data with convolution
     start_time = std::chrono::high_resolution_clock::now();
-
-		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
-		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
-
-    // timing analysis
-    stop_time = std::chrono::high_resolution_clock::now();
-    RF_run_time += stop_time-start_time;
-
-
-		// take downsampled filtered IQ data
+    // take downsampled filtered IQ data
 		std::vector<float>i_ds;
     i_ds.resize(i_filt.size()/rf_decim);
 		std::vector<float>q_ds;
     q_ds.resize(q_filt.size()/rf_decim);
 
-		downsample(rf_decim,i_filt,i_ds);
-		downsample(rf_decim,q_filt,q_ds);
+		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim,i_ds);
+		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
+
+    // timing analysis
+    stop_time = std::chrono::high_resolution_clock::now();
+    RF_run_time += stop_time-start_time;
 
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
@@ -153,7 +148,6 @@ void process_block_stream(int mode){
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     MONO_run_time += stop_time-start_time;
-
 
     // STEP 3: prepare audio data for output
     std::vector<short int> audio_data;

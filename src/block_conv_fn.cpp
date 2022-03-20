@@ -91,11 +91,14 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 }
 
 // block convolution function (with downsampling)
-void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim)
+void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
 	y.clear();
 	y.resize(x.size(), 0.0); // y of size i_data
+
+  // clear downsampled output
+  down.clear();
 
   // only compute the values we need (because of downsampling)
 	for (int n = 0; n < y.size(); n += rf_decim){
@@ -107,6 +110,7 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 				y[n] += h[k] * state[state.size() + n - k];
       }
     }
+    down.push_back(y[n]);
   }
 
   int index = x.size() - h.size() + 1;
@@ -120,7 +124,9 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 	y.clear();
 	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
 
+  // clear downsampled output
   down.clear();
+
   // only compute the values we need (because of downsampling)
 	for (int n = 0; n < y.size(); n += audio_decim){
     int phase = n % audio_exp;
@@ -135,7 +141,6 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
       }
       x_index--;
     }
-    
     down.push_back(y[n]);
   }
 

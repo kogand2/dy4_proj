@@ -1,7 +1,7 @@
-
 #include "block_conv_fn.h"
 #include "dy4.h"
 #include "iofunc.h"
+
 
 // Custom Demodulation Function
 std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vector<float> &dummy_state) {
@@ -39,7 +39,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   }
 
   dummy_state.clear();
-  
+
   dummy_state[0] = I[j];
   dummy_state[1] = Q[j];
 
@@ -65,50 +65,6 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 			h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
 	}
 }
-
-// Block convolution function
-/*void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
-{
-	// allocate memory for the output (filtered) data
-	y.clear();
-	y.resize(x.size(), 0.0);
-
-  // lead-in
-  for (int n = 0; n < h.size(); n++)
-  {
-    for (int k = 0; k < h.size(); k++){
-        if (n-k >= 0)
-          y[n] += h[k] * x[n-k];
-        else
-          y[n] += h[k] * state[state.size() + n - k];
-    }
-  }
-
-  // dominant partition
-  for (int n = h.size(); n < x.size(); n++)
-  {
-    for (int k = 0; k < h.size(); k++)
-    {
-        y[n] += h[k] * x[n-k];
-    }
-  }
-
-  // lead out
-  for (int n = x.size(); n < y.size(); n++)
-  {
-    for (int k = 0; k < h.size(); k++)
-    {
-      if (n-k < x.size())
-        y[n] += h[k] * x[n-k];
-      else
-        y[n] += h[k] * state[state.size() + n - k];
-    }
-  }
-
-  int index = x.size() - h.size() + 1;
-	state = std::vector<float>(x.begin() + index, x.end());
-
-}*/
 
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {

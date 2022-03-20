@@ -20,7 +20,13 @@ Ontario, Canada
 #include <chrono>
 
 void process_block_stream(int mode){
+
+  // TIMING VARIABLES
+  auto start_overall_time = std::chrono::high_resolution_clock::now();
   auto start_time = std::chrono::high_resolution_clock::now();
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> MONO_run_time;
+  std::chrono::duration<double, std::milli> RF_run_time;
 
   // Determine custom parameters depending on mode
   float rf_Fs;
@@ -98,16 +104,11 @@ void process_block_stream(int mode){
       std::cerr << "End of input stream reached" << std::endl;
 
       // timing analysis
-      auto stop_time = std::chrono::high_resolution_clock::now();
-		  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-		  std::cerr << DFT_run_time.count() << " milliseconds" << "\n";
-
-      std::cerr << "Use the following command to play the audio: \n";
-      if (mode == 2 || mode == 3)
-        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 44100 \n";
-      else
-        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 48000 \n";
-
+      stop_time = std::chrono::high_resolution_clock::now();
+		  std::chrono::duration<double, std::milli> OVERALL_run_time = stop_time-start_overall_time;
+		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
+      std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
+      std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
       exit(1);
     }
 
@@ -123,8 +124,15 @@ void process_block_stream(int mode){
     }
 
     // filter out IQ data with convolution
+    start_time = std::chrono::high_resolution_clock::now();
+
 		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
+
+    // timing analysis
+    stop_time = std::chrono::high_resolution_clock::now();
+    RF_run_time += stop_time-start_time;
+
 
 		// take downsampled filtered IQ data
 		std::vector<float>i_ds;
@@ -139,7 +147,13 @@ void process_block_stream(int mode){
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
     //std::cerr << "test1\n";
 		// STEP 2: Mono path
+    start_time = std::chrono::high_resolution_clock::now();
     std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
+
+    // timing analysis
+    stop_time = std::chrono::high_resolution_clock::now();
+    MONO_run_time += stop_time-start_time;
+
 
     // STEP 3: prepare audio data for output
     std::vector<short int> audio_data;

@@ -1,4 +1,3 @@
-
 #include "dy4.h"
 #include "filter.h"
 #include "fourier.h"
@@ -7,6 +6,9 @@
 #include "logfunc.h"
 #include "block_conv_fn.h"
 #include "mono_path.h"
+
+// testing time complexity
+#include <chrono>
 
 // read in raw block data
 void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
@@ -36,8 +38,14 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   if (mode == 2 || mode == 3)
   {
     // resample audio data
+    //auto start_time = std::chrono::high_resolution_clock::now();
     rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 
+    // timing analysis
+    /*auto stop_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
+    std::cerr << "MONO RESAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+    */
     // take downsampled filtered audio data
     audio_block.resize(audio_filt.size()/audio_decim);
     downsample(audio_decim, audio_filt, audio_block);
@@ -45,8 +53,14 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
 
   else{
     // filter out audio data with convolution
+    //auto start_time = std::chrono::high_resolution_clock::now();
     ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim);
 
+    // timing analysis
+    /*auto stop_time = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
+    std::cerr << "MONO DOWNSAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+    */
     // take downsampled filtered audio data
     audio_block.resize(audio_filt.size()/audio_decim);
     downsample(audio_decim, audio_filt, audio_block);

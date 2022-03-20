@@ -219,15 +219,17 @@ if __name__ == "__main__":
 	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Stereo Carrier Recovery
 	channel_block = np.zeros(shape=len(channel_coeff))	#For Stereo Channel Extraction
 	mono_block = np.zeros(shape=len(audio_coeff))		#For Monopath
-	complete_block = np.zeros(shape=len(audio_coeff))		#For Complete audio
+	complete_block = np.zeros((1024,2))		#For Complete audio
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
+
+	#prevStereo = np.zeros(shape=5121)
+	#prevCarrier = np.zeros(shape=5120)
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
 	stereo_data = np.array([])# used to concatenate filtered blocks (stereo data)
-	complete_data = np.array([]) #used to concatenate filtered blocks (complete data)
-
+	complete_data = np.zeros((2,1)) #used to concatenate filtered blocks (complete data) CREATES EXTRA 0 to be removed
 
 	while (block_count+1)*block_size < len(iq_data):
 	#RF FRONT END==================================================
@@ -256,7 +258,7 @@ if __name__ == "__main__":
 
         #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, dummy_fm, carrier_block)
-		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, audio_Fs, 2.0, 0.0, 0.01, pll_block)
+		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)
 
         #Stereo Channel Extraction: Bandpass
 		channel_filt,channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
@@ -274,25 +276,32 @@ if __name__ == "__main__":
 
 		audio_block = audio_filt[::audio_decim]
 
-		complete_block = np.zeros(shape=len(audio_block))
-		for i in range(len(audio_block)):
-			if(i%2 == 0):
-				complete_block[i] = audio_block[i] + stereo_block[i]
-			else:
-				complete_block[i] = audio_block[i] - stereo_block[i]
-		#print(complete_block)
 
-		complete_data = np.concatenate((complete_data, complete_block))
+		for i in range(len(complete_block)):
+			if(i%2 == 0):
+				complete_block[i][0] = audio_block[i//2] + stereo_block[i//2]
+			else:
+				complete_block[i][1] = audio_block[i//2] - stereo_block[i//2]
+		#print(complete_block)
+		#print(complete_data)
+
+		complete_data = np.concatenate((complete_data, complete_block.T),axis = 1)
 
 		#Generate Plots of PLL
-		if block_count >= 8 and block_count < 10:
-			x1 = range(500)
-			x2 = range(500)
-			fig2, axs = plt.subplots(2)
-			fig2.suptitle('PLL Checking')
-			axs[0].plot(x1, recoveredStereo[:500])
-			axs[1].plot(x2, carrier_filt[:500])
-			plt.show()
+		#if block_count >= 3 and block_count < 6:
+		#	x1 = range(50)
+		#	x2 = range(50)
+		#	fig2, axs = plt.subplots(2)
+		#	fig2.suptitle('PLL Checking')
+		#	axs[0].plot(x2, carrier_filt[:50], c='blue')
+		#	axs[0].plot(x2, prevCarrier[5070:], c='orange')
+		#	axs[0].set_title('Carrier Input', fontstyle='italic',fontsize='medium')
+		#	axs[1].plot(x1, recoveredStereo[:50], c='blue')
+		#	axs[1].plot(x1, prevStereo[5071:], c='orange')
+		#	axs[1].set_title('Carrier Output', fontstyle='italic',fontsize='medium')
+		#	plt.show()
+		#prevStereo = recoveredStereo
+		#prevCarrier = carrier_filt
 
 		if block_count >= 10 and block_count < 12:
 
@@ -309,10 +318,10 @@ if __name__ == "__main__":
 			# ... change as needed
 			fmPlotPSD(ax1, channel_filt, ((rf_Fs/rf_decim)/1e3), subfig_height[1], 'channel_filt')
 
-			fmPlotPSD(ax2, carrier_filt, ((rf_Fs/rf_decim)/1e3), subfig_height[2], 'carrier_filt')
+			fmPlotPSD(ax2, complete_data[1], ((rf_Fs/rf_decim)/1e3), subfig_height[2], 'Right Channel')
 			# plot PSD of selected block after downsampling mono audio
 			# ... change as needed
-			fmPlotPSD(ax3, complete_data, audio_Fs/1e3, subfig_height[3], 'Downsampled Complete Audio')
+			fmPlotPSD(ax3, complete_data[0], audio_Fs/1e3, subfig_height[3], 'Left Channel')
 			# save figure to file
 			fig.savefig("../data/fmMonoBlock" + str(block_count) + ".png")
 
@@ -321,8 +330,8 @@ if __name__ == "__main__":
 	print('Finished processing all the blocks from the recorded I/Q samples')
 
 	# write audio data to file
-	out_fname = "../data/fmMonoBlock.wav"
-	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*32767))
+	out_fname = "../data/fmStereoBlock.wav"
+	wavfile.write(out_fname, int(audio_Fs), np.int32((complete_data/2)*32767))
 	print("Written audio samples to \"" + out_fname + "\" in signed 16-bit format")
 
 	# uncomment assuming you wish to show some plots

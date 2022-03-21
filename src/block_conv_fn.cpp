@@ -52,6 +52,7 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 	// allocate memory for the impulse response
 	//h.clear();
 	h.resize(num_taps, 0.0);
+
 	float norm_co = Fc/(Fs/2);
 
 	// the rest of the code in this function is to be completed by you
@@ -69,8 +70,8 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
-	//y.clear();
-	//y.resize(x.size(), 0.0); // y of size i_data
+	y.clear();
+	y.resize(x.size(), 0.0); // y of size i_data
 
   // clear downsampled output
   down.clear();
@@ -96,8 +97,8 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
-	//y.clear();
-	//y.resize(x.size()*audio_exp, 0.0); // y of size i_data
+	y.clear();
+	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
 
   // clear downsampled output
   down.clear();

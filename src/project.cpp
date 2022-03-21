@@ -85,9 +85,7 @@ void process_block_stream(int mode){
 
   // filtered IQ data
   std::vector<float> i_filt;
-  i_filt.resize(i_data.size());
 	std::vector<float> q_filt;
-  q_filt.resize(q_data.size());
 
   // downsampled filtered IQ data
   std::vector<float>i_ds;

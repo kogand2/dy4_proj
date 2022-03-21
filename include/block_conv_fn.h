@@ -22,8 +22,8 @@ void low_pass_coeff(float, float, int, std::vector<float> &);
 
 void state_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &);
 
-void ds_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int);
+void ds_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int, std::vector<float> &);
 
-void rs_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int, int);
+void rs_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &, int, int, std::vector<float> &);
 
 #endif // DY4_BLOCKCONVFN_H

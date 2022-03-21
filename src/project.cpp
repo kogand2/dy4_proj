@@ -20,7 +20,13 @@ Ontario, Canada
 #include <chrono>
 
 void process_block_stream(int mode){
+
+  // TIMING VARIABLES
+  auto start_overall_time = std::chrono::high_resolution_clock::now();
   auto start_time = std::chrono::high_resolution_clock::now();
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> MONO_run_time;
+  std::chrono::duration<double, std::milli> RF_run_time;
 
   // Determine custom parameters depending on mode
   float rf_Fs;
@@ -55,11 +61,11 @@ void process_block_stream(int mode){
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 151;
+	int rf_taps = 51;
 
   // audio path variables
 	float audio_Fc = 16000;
-	int audio_taps = 151;
+	int audio_taps = 51;
 
   // RF LPF filter coefficients
 	std::vector<float> rf_coeff;
@@ -69,21 +75,33 @@ void process_block_stream(int mode){
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-	float block_size = 102400;
+	float block_size = 1024*audio_decim;
 
-  // filtered data
+  // regular IQ data
+  std::vector<float> i_data;
+  i_data.resize(block_size / 2);
+  std::vector<float> q_data;
+  q_data.resize(block_size / 2);
+
+  // filtered IQ data
   std::vector<float> i_filt;
 	std::vector<float> q_filt;
 
+  // downsampled filtered IQ data
+  std::vector<float>i_ds;
+  i_ds.reserve(i_filt.size()/rf_decim);
+  std::vector<float>q_ds;
+  q_ds.reserve(q_filt.size()/rf_decim);
+
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
-  audio_state.resize(audio_coeff.size() - 1, 0.0);
+  audio_state.resize(audio_coeff.size() - 1);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
 	std::vector<float> state_q_lpf_100k;
-	state_i_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
-	state_q_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
+	state_i_lpf_100k.resize(rf_coeff.size() - 1);
+	state_q_lpf_100k.resize(rf_coeff.size() - 1);
 
   // demodulation variables
 	std::vector<float> demod_state;
@@ -98,48 +116,42 @@ void process_block_stream(int mode){
       std::cerr << "End of input stream reached" << std::endl;
 
       // timing analysis
-      auto stop_time = std::chrono::high_resolution_clock::now();
-		  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-		  std::cerr << DFT_run_time.count() << " milliseconds" << "\n";
-
-      std::cerr << "Use the following command to play the audio: \n";
-      if (mode == 2 || mode == 3)
-        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 44100 \n";
-      else
-        std::cerr << "cat test.bin | aplay -c 1 -f S16_LE -r 48000 \n";
-
+      stop_time = std::chrono::high_resolution_clock::now();
+		  std::chrono::duration<double, std::milli> OVERALL_run_time = stop_time-start_overall_time;
+		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
+      std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
+      std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
       exit(1);
     }
 
     //std::cerr << "Processing block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
-		std::vector<float> i_data(block_size / 2);
-    std::vector<float> q_data(block_size / 2);
-
+    // take IQ data in
 		for (int k = 0; k < block_size / 2; k++) {
       i_data[k] = block_data[2*k];
       q_data[k] = block_data[2*k + 1];
     }
 
-    // filter out IQ data with convolution
-		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim);
-		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim);
+    // filter out IQ data with convolution and downsample
+    start_time = std::chrono::high_resolution_clock::now();
+		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim,i_ds);
+		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
 
-		// take downsampled filtered IQ data
-		std::vector<float>i_ds;
-    i_ds.resize(i_filt.size()/rf_decim);
-		std::vector<float>q_ds;
-    q_ds.resize(q_filt.size()/rf_decim);
-
-		downsample(rf_decim,i_filt,i_ds);
-		downsample(rf_decim,q_filt,q_ds);
+    // timing analysis
+    stop_time = std::chrono::high_resolution_clock::now();
+    RF_run_time += stop_time-start_time;
 
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
-    //std::cerr << "test1\n";
+
 		// STEP 2: Mono path
+    start_time = std::chrono::high_resolution_clock::now();
     std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
+
+    // timing analysis
+    stop_time = std::chrono::high_resolution_clock::now();
+    MONO_run_time += stop_time-start_time;
 
     // STEP 3: prepare audio data for output
     std::vector<short int> audio_data;

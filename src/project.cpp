@@ -77,19 +77,33 @@ void process_block_stream(int mode){
 
 	float block_size = 1024*audio_decim;
 
-  // filtered data
+  // regular IQ data
+  std::vector<float> i_data;
+  i_data.resize(block_size / 2);
+  std::vector<float> q_data;
+  q_data.resize(block_size / 2);
+
+  // filtered IQ data
   std::vector<float> i_filt;
+  i_filt.resize(i_data.size());
 	std::vector<float> q_filt;
+  q_filt.resize(q_data.size());
+
+  // downsampled filtered IQ data
+  std::vector<float>i_ds;
+  i_ds.reserve(i_filt.size()/rf_decim);
+  std::vector<float>q_ds;
+  q_ds.reserve(q_filt.size()/rf_decim);
 
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
-  audio_state.resize(audio_coeff.size() - 1, 0.0);
+  audio_state.resize(audio_coeff.size() - 1);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
 	std::vector<float> state_q_lpf_100k;
-	state_i_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
-	state_q_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
+	state_i_lpf_100k.resize(rf_coeff.size() - 1);
+	state_q_lpf_100k.resize(rf_coeff.size() - 1);
 
   // demodulation variables
 	std::vector<float> demod_state;
@@ -115,22 +129,14 @@ void process_block_stream(int mode){
     //std::cerr << "Processing block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
-		std::vector<float> i_data(block_size / 2);
-    std::vector<float> q_data(block_size / 2);
-
+    // take IQ data in
 		for (int k = 0; k < block_size / 2; k++) {
       i_data[k] = block_data[2*k];
       q_data[k] = block_data[2*k + 1];
     }
 
-    // filter out IQ data with convolution
+    // filter out IQ data with convolution and downsample
     start_time = std::chrono::high_resolution_clock::now();
-    // take downsampled filtered IQ data
-		std::vector<float>i_ds;
-    i_ds.resize(i_filt.size()/rf_decim);
-		std::vector<float>q_ds;
-    q_ds.resize(q_filt.size()/rf_decim);
-
 		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim,i_ds);
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
 
@@ -140,7 +146,7 @@ void process_block_stream(int mode){
 
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
-    //std::cerr << "test1\n";
+
 		// STEP 2: Mono path
     start_time = std::chrono::high_resolution_clock::now();
     std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);

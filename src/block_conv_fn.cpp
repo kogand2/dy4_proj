@@ -50,9 +50,8 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
 void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 {
 	// allocate memory for the impulse response
-	h.clear();
+	//h.clear();
 	h.resize(num_taps, 0.0);
-
 	float norm_co = Fc/(Fs/2);
 
 	// the rest of the code in this function is to be completed by you
@@ -66,36 +65,12 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 	}
 }
 
-void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
-{
-	// allocate memory for the output (filtered) data
-	y.clear();
-	y.resize(x.size(), 0.0);
-
-	// implement block processing algorithm discussed in lecture and used in python
-	for (int n = 0; n < y.size(); n++){
-		for (int k = 0; k < h.size(); k++){
-			if (n-k >= 0){
-				y[n] += h[k] * x[n - k];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n - k << "]\n";
-			}else{
-				y[n] += h[k] * state[state.size() + n - k];
-        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  n - k << "]\n";
-      }
-    }
-  }
-
-  int index = x.size() - h.size() + 1;
-	state = std::vector<float>(x.begin() + index, x.end());
-
-}
-
 // block convolution function (with downsampling)
 void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
-	y.clear();
-	y.resize(x.size(), 0.0); // y of size i_data
+	//y.clear();
+	//y.resize(x.size(), 0.0); // y of size i_data
 
   // clear downsampled output
   down.clear();
@@ -121,8 +96,8 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
-	y.clear();
-	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
+	//y.clear();
+	//y.resize(x.size()*audio_exp, 0.0); // y of size i_data
 
   // clear downsampled output
   down.clear();

@@ -40,7 +40,8 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   {
     // resample audio data
     //auto start_time = std::chrono::high_resolution_clock::now();
-    audio_block.resize(audio_filt.size()/audio_decim);
+    audio_filt.resize(IQ_demod.size()*audio_exp);
+    audio_block.reserve(audio_filt.size()/audio_decim);
     rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
 
     // timing analysis
@@ -55,7 +56,8 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
   else{
     // filter out audio data with convolution
     //auto start_time = std::chrono::high_resolution_clock::now();
-    audio_block.resize(audio_filt.size()/audio_decim);
+    audio_filt.resize(IQ_demod.size());
+    audio_block.reserve(audio_filt.size()/audio_decim);
     ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
 
     // timing analysis

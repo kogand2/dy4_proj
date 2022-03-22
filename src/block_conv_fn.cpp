@@ -2,6 +2,8 @@
 #include "dy4.h"
 #include "iofunc.h"
 
+// testing time complexity
+#include <chrono>
 
 // Custom Demodulation Function
 std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vector<float> &dummy_state) {
@@ -70,12 +72,17 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
+  auto start_time = std::chrono::high_resolution_clock::now();
 	y.clear();
 	y.resize(x.size(), 0.0); // y of size i_data
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
+  std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
 
   // clear downsampled output
   down.clear();
-
+  int count = 0;
+  //start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
 	for (int n = 0; n < y.size(); n += rf_decim){
 		for (int k = 0; k < h.size(); k++){
@@ -85,41 +92,73 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
       else{
 				y[n] += h[k] * state[state.size() + n - k];
       }
+      count++;
     }
     down.push_back(y[n]);
   }
 
+  stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
+  std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+
+  start_time = std::chrono::high_resolution_clock::now();
+
+  std::cerr << "ds: " << count << "\n";
   int index = x.size() - h.size() + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
+
+  stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
+  std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }
 
 // block convolution function (with resampling)
 void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
+  auto start_time = std::chrono::high_resolution_clock::now();
 	y.clear();
-	y.resize(x.size()*audio_exp, 0.0); // y of size i_data
-
+	y.reserve(x.size()*audio_exp); // y of size i_data
+  int count = 0;
+  int phase, x_index;
   // clear downsampled output
   down.clear();
 
+  auto stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
+  std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
+
+  start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
-	for (int n = 0; n < y.size(); n += audio_decim){
-    int phase = n % audio_exp;
-    int x_index = (n - phase) / audio_exp;
+	for (int n = 0; n < x.size()*audio_exp; n += audio_decim){
+    phase = n % audio_exp;
+    x_index = (n - phase) / audio_exp;
 
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
 				y[n] += audio_exp * h[k] * x[x_index];
+        //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << x_index << "]\n";
       }
       else{
 				y[n] += audio_exp * h[k] * state[state.size() + x_index];
+        //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  x_index << "]\n";
       }
       x_index--;
+      count++;
     }
     down.push_back(y[n]);
   }
+  stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
+  std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
 
+  start_time = std::chrono::high_resolution_clock::now();
+
+  std::cerr << "rs: " << count << "\n";
   int index = x.size() - h.size()/audio_exp + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
+
+  stop_time = std::chrono::high_resolution_clock::now();
+  std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
+  std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }

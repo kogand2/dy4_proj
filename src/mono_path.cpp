@@ -32,16 +32,15 @@ void downsample(int D, std::vector<float> input, std::vector<float> &down)
     }
 }
 
-std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
-  std::vector<float> audio_filt;
+std::vector<float> mono_path(int mode, std::vector<float> audio_filt, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
   std::vector<float> audio_block;
 
-  if (mode == 2 || mode == 3)
+  if (mode == 0 || mode == 1)
   {
     // resample audio data
     //auto start_time = std::chrono::high_resolution_clock::now();
     audio_block.reserve(audio_filt.size()/audio_decim);
-    rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
+    ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
 
     // timing analysis
     /*auto stop_time = std::chrono::high_resolution_clock::now();
@@ -56,7 +55,8 @@ std::vector<float> mono_path(int mode, std::vector<float> IQ_demod, std::vector<
     // filter out audio data with convolution
     //auto start_time = std::chrono::high_resolution_clock::now();
     audio_block.reserve(audio_filt.size()/audio_decim);
-    ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
+    rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
+
 
     // timing analysis
     /*auto stop_time = std::chrono::high_resolution_clock::now();

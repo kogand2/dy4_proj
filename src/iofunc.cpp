@@ -14,7 +14,7 @@ Ontario, Canada
 void printRealVector(const std::vector<float> &x)
 {
 	std::cerr << "Printing float vector of size " << x.size() << "\n";
-	for (unsigned int i = 0; i < 2561; i++)
+	for (unsigned int i = 0; i < x.size(); i += 800)
 		std::cerr << x[i] << " ";
 	std::cerr << "\n";
 }

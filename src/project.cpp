@@ -28,7 +28,6 @@ void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data
   }
 }
 
-
 void process_block_stream(int mode){
 
   // TIMING VARIABLES
@@ -89,8 +88,6 @@ void process_block_stream(int mode){
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-
-
   int total = 0;
   // regular IQ data
   std::vector<float> i_data;
@@ -115,7 +112,7 @@ void process_block_stream(int mode){
   audio_state.resize(audio_coeff.size() - 1);
 
   std::vector<float> audio_filt;
-   audio_filt.resize(audio_exp*block_size/rf_decim, 0.0);
+  audio_filt.resize(audio_exp*block_size/rf_decim, 0.0);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
@@ -147,7 +144,7 @@ void process_block_stream(int mode){
       exit(1);
     }
 
-    std::cerr << "Processing Block " << block_id << std::endl;
+    //std::cerr << "Processing Block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
     // take IQ data in
@@ -223,7 +220,7 @@ void process_block_stream(int mode){
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
     auto t_stop_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> t_run_time = t_stop_time-t_start_time;
-    std::cerr << "BLOCK RUNTIME: " << t_run_time.count() << " ms" << "\n\n";
+    //std::cerr << "BLOCK RUNTIME: " << t_run_time.count() << " ms" << "\n\n";
     //break;
 	}
 }

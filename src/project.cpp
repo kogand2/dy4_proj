@@ -61,11 +61,11 @@ void process_block_stream(int mode){
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 51;
+	int rf_taps = 101;
 
   // audio path variables
 	float audio_Fc = 16000;
-	int audio_taps = 51;
+	int audio_taps = 101;
 
   // RF LPF filter coefficients
 	std::vector<float> rf_coeff;
@@ -75,8 +75,8 @@ void process_block_stream(int mode){
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-	float block_size = 1024*audio_decim;
-
+	float block_size = 2560*10*rf_decim;
+  int total = 0;
   // regular IQ data
   std::vector<float> i_data;
   i_data.resize(block_size / 2);
@@ -96,6 +96,9 @@ void process_block_stream(int mode){
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
   audio_state.resize(audio_coeff.size() - 1);
+
+  std::vector<float> audio_filt;
+  audio_filt.resize(audio_exp*block_size/rf_decim, 0.0);
 
   // state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
@@ -121,6 +124,7 @@ void process_block_stream(int mode){
 		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
       std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
       std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
+      std::cerr << "TOTAL MONOPATH: " << total << "\n";
       exit(1);
     }
 
@@ -147,8 +151,9 @@ void process_block_stream(int mode){
 
 		// STEP 2: Mono path
     start_time = std::chrono::high_resolution_clock::now();
-    std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
-
+    std::vector<float> audio_block = mono_path(mode, audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
+    total += 1;
+    break;
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     MONO_run_time += stop_time-start_time;

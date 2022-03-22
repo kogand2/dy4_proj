@@ -44,6 +44,12 @@ def myBandPass(fb, fe, fs, Ntaps):
 
 	return  h
 
+def myAllPass(input_block, state_block):
+	output_block = np.concatenate((state_block, input_block[:-len(state_block)]))
+	state_block = input_block[-len(state_block):]
+
+	return output_block, state_block
+
 def block_convolution(h, xb, state):
 	yb = np.zeros(len(xb))
 	stateLen = len(state)
@@ -168,7 +174,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0.raw"
+	in_fname = "../data/stereo_l0_r9.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -197,6 +203,7 @@ if __name__ == "__main__":
 	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
 
 	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
+	mono_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
 
 	# set up the subfigures for plotting
 	subfig_height = np.array([0.8, 2, 2, 1.6]) # relative heights of the subfigures
@@ -222,6 +229,8 @@ if __name__ == "__main__":
 
 	left_block = np.zeros(shape=1024)		#For Monopath
 	right_block = np.zeros(shape=1024)		#For Monopath
+	delay_block = np.zeros(shape=(audio_taps-1)//2)		#For Monopath
+
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
@@ -257,12 +266,14 @@ if __name__ == "__main__":
 		# you MUST have also "custom" state-saving for your own FM demodulator
 		dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
 
+		#print(len(i_ds))
     #RF front end stops here==================================================
 
 		# extract the stereo audio data
 
         #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, dummy_fm, carrier_block)
+
 		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)
 
         #Stereo Channel Extraction: Bandpass
@@ -276,7 +287,9 @@ if __name__ == "__main__":
 		stereo_block = stereo_filt[::audio_decim]
 
 		# extract the mono audio data
-		audio_filt,mono_block = block_convolution(audio_coeff, dummy_fm, mono_block)
+		audio_filt,mono_block = block_convolution(mono_coeff, dummy_fm, mono_block)
+
+		audio_filt, delay_block = myAllPass(audio_filt, delay_block)
 
 		audio_block = audio_filt[::audio_decim]
 

@@ -141,7 +141,7 @@ void process_block_stream(int mode){
       stop_time = std::chrono::high_resolution_clock::now();
 		  std::chrono::duration<double, std::milli> OVERALL_run_time = stop_time-start_overall_time;
 		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
-      std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
+      std::cerr << "RF FRONTEND RUNTIME: " << RF_run_time.count() << " ms" << "\n";
       std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
       std::cerr << "TOTAL MONOPATH: " << total << "\n";
       exit(1);

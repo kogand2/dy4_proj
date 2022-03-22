@@ -173,7 +173,7 @@ void process_block_stream(int mode){
 	}
 }
 
-int main(int argc, char* argv[])
+/*int main(int argc, char* argv[])
 {
   int mode = 0;
 
@@ -201,4 +201,4 @@ int main(int argc, char* argv[])
   process_block_stream(mode);
 
 	return 0;
-}
+}*/

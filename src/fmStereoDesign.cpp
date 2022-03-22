@@ -13,25 +13,6 @@
 // testing time complexity
 #include <chrono>
 
-//Low pass filter coefficients
-void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
-{
-	// allocate memory for the impulse response
-	h.clear();
-	h.resize(num_taps, 0.0);
-
-	float norm_co = Fc/(Fs/2);
-
-	// the rest of the code in this function is to be completed by you
-	// based on your understanding and the Python code from the first lab
-	for (int i = 0; i < num_taps; i++){
-			if (i == (num_taps-1)/2)
-		    h[i] = norm_co;
-			else
-			  h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
-			h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
-	}
-}
 
 void band_pass_coeff(float Fb, float Fe, float Fs, int num_taps, std::vector<float> &h)
 {
@@ -51,34 +32,7 @@ void band_pass_coeff(float Fb, float Fe, float Fs, int num_taps, std::vector<flo
   }
 }
 
-// block convolution function (with downsampling)
-void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
-{
-  	// allocate memory for the output (filtered) data
-  	y.clear();
-  	y.resize(x.size(), 0.0); // y of size i_data
-
-    // clear downsampled output
-    down.clear();
-
-    // only compute the values we need (because of downsampling)
-  	for (int n = 0; n < y.size(); n += rf_decim){
-  		for (int k = 0; k < h.size(); k++){
-  			if (n-k >= 0){
-  				y[n] += h[k] * x[n - k];
-        }
-        else{
-  				y[n] += h[k] * state[state.size() + n - k];
-        }
-      }
-      down.push_back(y[n]);
-    }
-
-    int index = x.size() - h.size() + 1;
-  	state = std::vector<float>(x.begin() + index, x.end());
-  }
-
-void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<float> &new_state, float freq, float Fs, float ncoScale = 2.0, float phaseAdjust = 0.0, float normBandwidth = 0.01, std::vector<float> &state)
+void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<float> &state, float freq, float Fs, float ncoScale = 2.0, float phaseAdjust = 0.0, float normBandwidth = 0.01)
 {
     float Cp = 2.666;
     float Ci = 3.555;
@@ -95,6 +49,8 @@ void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<fl
   	float feedbackQ = state[3];
   	ncoOut[0] = state[4];
   	float trigOffset = state[5];
+
+		float errorI, errorQ, errorD, trigArg;
 
     for (int k = 0; k < pllIn.size(); k++){
       errorI = pllIn[k] * (+feedbackI);  //complex conjugate of the
@@ -116,7 +72,12 @@ void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<fl
   		feedbackQ = std::sin(trigArg);
   		ncoOut[k+1] = std::cos(trigArg*ncoScale + phaseAdjust);
     }
-    new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOut[-1], trigOffset];
+    state[0] = integrator;
+		state[1] = phaseEst;
+		state[2] = feedbackI;
+		state[3] = feedbackQ;
+		state[4] = ncoOut[-1];
+		state[5] = trigOffset;
 }
 
 void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt, std::vector<float> &mixedAudio)
@@ -129,21 +90,12 @@ void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt
   }
 }
 
-void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
-  std::vector<char> raw_data(num_samples);
-  std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
-  for(int k = 0; k < (int)num_samples; k++) {
-    block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
-  }
-}
-
-
-std::vector<float> stereo_path_main(){
+std::vector<float> stereo_path_main(int mode){
 	// TIMING VARIABLES
   auto start_overall_time = std::chrono::high_resolution_clock::now();
   auto start_time = std::chrono::high_resolution_clock::now();
   auto stop_time = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> MONO_run_time;
+  std::chrono::duration<double, std::milli> STEREO_run_time;
   std::chrono::duration<double, std::milli> RF_run_time;
 
   // Determine custom parameters depending on mode
@@ -189,9 +141,13 @@ std::vector<float> stereo_path_main(){
 	std::vector<float> rf_coeff, carrier_coeff, channel_coeff, audio_coeff;
 
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
+	std::cerr << "test 1" << "\n";
 	band_pass_coeff(18500, 19500, rf_Fs/rf_decim, audio_taps, carrier_coeff);
+	std::cerr << "test 2" << "\n";
 	band_pass_coeff(22000, 54000, rf_Fs/rf_decim, audio_taps, channel_coeff);
+	std::cerr << "test 3" << "\n";
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
+	std::cerr << "test 4" << "\n";
 
 	float block_size = 1024*rf_decim*audio_decim*2;
 
@@ -223,10 +179,6 @@ std::vector<float> stereo_path_main(){
 	pll_block[4] = 1.0;
 	pll_block[5] = 0.0;
 
-	std::vector<float> prevStereo, prevCarrier;
-	prevStereo.resize(5121);
-	prevCarrier.resize(5120);
-
 	// state saving variables for I and Q samples convolution
 	std::vector<float> state_i_lpf_100k;
 	std::vector<float> state_q_lpf_100k;
@@ -235,6 +187,16 @@ std::vector<float> stereo_path_main(){
 
 	//audio buffer that stores all the audio blocks
 	std::vector<float> audio_data, stereo_data, left_data, right_data;
+	std::vector<float> carrier_filt, dummy_fm, channel_filt, down_carrier, down_channel, recoveredStereo, down_stereo;
+
+	// STEP 1: IQ samples demodulation
+	std::vector<float> i_data(block_size / 2);
+	std::vector<float> q_data(block_size / 2);
+
+	carrier_filt.resize(i_data.size());
+	channel_filt.resize(i_data.size());
+
+	std::vector<std::vector<float>> complete_data;
 
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
@@ -248,13 +210,9 @@ std::vector<float> stereo_path_main(){
 		  std::chrono::duration<double, std::milli> OVERALL_run_time = stop_time-start_overall_time;
 		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
       std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
-      std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
+      std::cerr << "TOTAL MONOPATH RUNTIME: " << STEREO_run_time.count() << " ms" << "\n";
       exit(1);
     }
-
-		// STEP 1: IQ samples demodulation
-		std::vector<float> i_data(block_size / 2);
-    std::vector<float> q_data(block_size / 2);
 
 		for (int k = 0; k < block_size / 2; k++) {
       i_data[k] = block_data[2*k];
@@ -284,23 +242,25 @@ std::vector<float> stereo_path_main(){
     //std::vector<float> audio_block = mono_path(mode, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
 
 		//Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled
-		std::vector<float> carrier_filt, down_carrier, down_channel, recoveredStereo, new_state, down_stereo;
 		const std::vector<float> x;
-
-		ds_block_conv(carrier_filt, dummy_fm, carrier_coeff, carrier_block, rf_decim, down_carrier);
-		fmPll(carrier_filt, recoveredStereo, new_state, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block);
+		std::cerr << "test 8" << "\n";
+		ds_block_conv(carrier_filt, IQ_demod, carrier_coeff, carrier_block, rf_decim, down_carrier);
+		std::cerr << "test 9" << "\n";
+		fmPll(carrier_filt, recoveredStereo, pll_block, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01);
+		std::cerr << "test 5" << "\n";
 
     //Stereo Channel Extraction: Bandpass
-		ds_block_conv(channel_filt, dummy_fm, channel_coeff, channel_block, rf_decim, down_channel);
+		ds_block_conv(channel_filt, IQ_demod, channel_coeff, channel_block, rf_decim, down_channel);
 
     //Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
 		std::vector<float> mixedAudio, stereo_filt, stereo_block;
 		mixer(recoveredStereo, channel_filt, mixedAudio);
+		std::cerr << "test 6" << "\n";
 
 		ds_block_conv(stereo_filt, mixedAudio, audio_coeff, filt_block, rf_decim, down_stereo);
 
 		for (int i = 0; i < stereo_filt.size(); i+=audio_decim){
-			stereo_block.push_back(stereo_filt[i)];
+			stereo_block.push_back(stereo_filt[i]);
 		}
 
 		//extract the mono audio data
@@ -313,31 +273,75 @@ std::vector<float> stereo_path_main(){
     ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
 		audio_block.reserve(audio_filt.size()/audio_decim);
 
+		std::vector<float> index;
+
 		for (int i = 0; i < audio_block.size(); i++){
+			index.clear();
 			left_block[i] = audio_block[i] + stereo_block[i];
 			right_block[i] = audio_block[i] - stereo_block[i];
+			index.push_back(left_block[i]);
+			index.push_back(right_block[i]);
+			complete_data.push_back(index);
 		}
 
-		left_data.insert(left_data.end(), left_block.begin(), left_block.end());
-		right_data.insert(right_data.end(), right_data.begin(), right_data.end());
+		//left_data.insert(left_data.end(), left_block.begin(), left_block.end());
+		//right_data.insert(right_data.end(), right_data.begin(), right_data.end());
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     STEREO_run_time += stop_time-start_time;
 
     // STEP 3: prepare audio data for output
-    std::vector<short int> audio_data;
+    std::vector<std::vector<short int>> audio_data;
+		std::vector<short int> complete_block;
 
-    for (unsigned int k = 0; k < audio_block.size(); k++) {
-      if(std::isnan(audio_block[k])){
-        audio_data.push_back(0);
+    for (unsigned int k = 0; k < complete_data.size(); k++) {
+      if(std::isnan(complete_data[k][0])){
+				std::vector<short int> temp;
+				temp.push_back(0);
+				temp.push_back(0);
+        audio_data.push_back(temp);
       }
       else{
-        audio_data.push_back(static_cast<short int>(audio_block[k] * 16384));
+				complete_block.clear();
+				complete_block.push_back(static_cast<short int>(complete_data[k][0] * 16384));
+				complete_block.push_back(static_cast<short int>(complete_data[k][1] * 16384));
+				audio_data.push_back(complete_block);
       }
     }
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
+
 	}
+	std::cerr << "test 7" << "\n";
 
+}
 
+int main(int argc, char* argv[])
+{
+  int mode = 0;
+
+  // default operation
+  if (argc < 2){
+    std::cerr << "Operating in default mode 0" << std::endl;
+  }
+  // mode operation
+  else if (argc == 2){
+    mode = atoi(argv[1]);
+    if (mode > 3){
+      std::cerr << "Not a valid mode: " << mode << std::endl;
+      exit(1);
+    }
+  }
+  else{
+    std::cerr << "Usage: " << argv[0] << std::endl;
+    std::cerr << "or " << std::endl;
+    std::cerr << "Usage: " << argv[0] << " <mode>" << std::endl;
+    std::cerr << "\t\t <mode> is a value from 0 to 3" << std::endl;
+    exit(1);
+  }
+
+  std::cerr << "Operating in mode " << mode << std::endl;
+  stereo_path_main(mode);
+
+	return 0;
 }

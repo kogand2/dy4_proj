@@ -10,15 +10,6 @@
 // testing time complexity
 #include <chrono>
 
-// read in raw block data
-void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
-  std::vector<char> raw_data(num_samples);
-  std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
-  for(int k = 0; k < (int)num_samples; k++) {
-    block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
-  }
-}
-
 // dowsampling function
 void downsample(int D, std::vector<float> input, std::vector<float> &down)
 {
@@ -32,7 +23,7 @@ void downsample(int D, std::vector<float> input, std::vector<float> &down)
     }
 }
 
-std::vector<float> mono_path(int mode, std::vector<float> audio_filt, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
+std::vector<float> mono_path_i(int mode, std::vector<float> audio_filt, std::vector<float> IQ_demod, std::vector<float> audio_coeff, std::vector<float> &audio_state, int audio_decim, int audio_exp){
   std::vector<float> audio_block;
 
   if (mode == 0 || mode == 1)

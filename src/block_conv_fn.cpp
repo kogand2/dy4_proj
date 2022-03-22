@@ -69,7 +69,7 @@ void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 }
 
 // block convolution function (with downsampling)
-void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
+void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std::vector<float> h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
@@ -79,8 +79,6 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
   std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
 
-  // clear downsampled output
-  down.clear();
   int count = 0;
   //start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
@@ -113,16 +111,14 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 }
 
 // block convolution function (with resampling)
-void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
+void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std::vector<float> h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
 	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
 	y.clear();
-	y.reserve(x.size()*audio_exp); // y of size i_data
+	y.resize(x.size()*audio_exp); // y of size i_data
   int count = 0;
   int phase, x_index;
-  // clear downsampled output
-  down.clear();
 
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
@@ -130,7 +126,7 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
 
   start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
-	for (int n = 0; n < x.size()*audio_exp; n += audio_decim){
+	for (int n = 0; n < y.size(); n += audio_decim){
     phase = n % audio_exp;
     x_index = (n - phase) / audio_exp;
 
@@ -148,6 +144,7 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> &x, const std
     }
     down.push_back(y[n]);
   }
+
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
   std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";

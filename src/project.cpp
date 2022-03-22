@@ -68,7 +68,7 @@ void process_block_stream(int mode){
       rf_decim = 9;
       audio_exp = 441;
       audio_decim = 2560;
-      block_size = 102400;
+      block_size = 2560*rf_decim*10;
       break;
   }
 
@@ -149,7 +149,7 @@ void process_block_stream(int mode){
       exit(1);
     }
 
-    //std::cerr << "Processing Block " << block_id << std::endl;
+    std::cerr << "Processing Block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
     // take IQ data in
@@ -202,7 +202,7 @@ void process_block_stream(int mode){
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
     auto t_stop_time = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> t_run_time = t_stop_time-t_start_time;
-    //std::cerr << "BLOCK RUNTIME: " << t_run_time.count() << " ms" << "\n\n";
+    std::cerr << "BLOCK RUNTIME: " << t_run_time.count() << " ms" << "\n\n";
     //break;
 	}
 }

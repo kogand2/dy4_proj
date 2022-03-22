@@ -77,7 +77,7 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 	//y.resize(x.size(), 0.0); // y of size i_data
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
-  //std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
+  std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
 
   int count = 0;
   //start_time = std::chrono::high_resolution_clock::now();
@@ -98,17 +98,17 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-  //std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+  std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
 
   start_time = std::chrono::high_resolution_clock::now();
 
-  //std::cerr << "ds: " << count << "\n";
+  std::cerr << "ds: " << count << "\n";
   int index = x.size() - h.size() + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
-  //std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
+  std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }
 
 // block convolution function (with resampling)
@@ -123,7 +123,7 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
-  //std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
+  std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
 
   start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
@@ -148,15 +148,15 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-  //std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+  std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
 
   start_time = std::chrono::high_resolution_clock::now();
 
-  //std::cerr << "rs: " << count << "\n";
+  std::cerr << "rs: " << count << "\n";
   int index = x.size() - h.size()/audio_exp + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
-  //std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
+  std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }

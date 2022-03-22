@@ -19,27 +19,18 @@ Ontario, Canada
 // testing time complexity
 #include <chrono>
 
-// read in raw block data
-void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
-  std::vector<char> raw_data(num_samples);
-  std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
-  for(int k = 0; k < (int)num_samples; k++) {
-    block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
-  }
-}
-
 void process_block_stream(int mode){
 
   // TIMING VARIABLES
   auto start_overall_time = std::chrono::high_resolution_clock::now();
   auto start_time = std::chrono::high_resolution_clock::now();
   auto stop_time = std::chrono::high_resolution_clock::now();
-  std::chrono::duration<double, std::milli> MONO_run_time = std::chrono::milliseconds::zero();
-  std::chrono::duration<double, std::milli> RF_run_time = std::chrono::milliseconds::zero();
+  std::chrono::duration<double, std::milli> MONO_run_time;
+  std::chrono::duration<double, std::milli> RF_run_time;
 
   // Determine custom parameters depending on mode
   float rf_Fs;
-  int rf_decim, audio_decim, audio_exp, block_size;
+  int rf_decim, audio_decim, audio_exp;
 
   switch(mode) {
     case 0:
@@ -47,28 +38,24 @@ void process_block_stream(int mode){
       rf_decim = 10;
       audio_exp = 1;
       audio_decim = 5;
-      block_size = 102400;
       break;
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
       audio_exp = 1;
       audio_decim = 6;
-      block_size = 102400;
       break;
     case 2:
       rf_Fs = 2400000.0;
       rf_decim = 10;
       audio_exp = 147;
       audio_decim = 800;
-      block_size = 102400;
       break;
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
       audio_exp = 441;
       audio_decim = 2560;
-      block_size = 2560*rf_decim*10;
       break;
   }
 
@@ -88,6 +75,7 @@ void process_block_stream(int mode){
 	std::vector<float> audio_coeff;
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
+	float block_size = 2560*10*rf_decim;
   int total = 0;
   // regular IQ data
   std::vector<float> i_data;
@@ -97,33 +85,26 @@ void process_block_stream(int mode){
 
   // filtered IQ data
   std::vector<float> i_filt;
-  i_filt.resize(i_data.size());
 	std::vector<float> q_filt;
-  q_filt.resize(q_data.size());
 
   // downsampled filtered IQ data
   std::vector<float>i_ds;
-  i_ds.resize(i_filt.size()/rf_decim);
+  i_ds.reserve(i_filt.size()/rf_decim);
   std::vector<float>q_ds;
-  q_ds.resize(q_filt.size()/rf_decim);
-
-  // state saving variables for I and Q samples convolution
-  std::vector<float> state_i_lpf_100k;
-  std::vector<float> state_q_lpf_100k;
-  state_i_lpf_100k.resize(rf_coeff.size() - 1);
-  state_q_lpf_100k.resize(rf_coeff.size() - 1);
-
-  // filtered audio data
-  std::vector<float> audio_filt;
-  audio_filt.resize(audio_exp*(i_ds.size() - 1));
-
-  // downsampled filtered audio data
-  std::vector<float> audio_block;
-  audio_block.resize(audio_filt.size()/audio_decim);
+  q_ds.reserve(q_filt.size()/rf_decim);
 
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
   audio_state.resize(audio_coeff.size() - 1);
+
+  std::vector<float> audio_filt;
+  audio_filt.resize(audio_exp*block_size/rf_decim, 0.0);
+
+  // state saving variables for I and Q samples convolution
+	std::vector<float> state_i_lpf_100k;
+	std::vector<float> state_q_lpf_100k;
+	state_i_lpf_100k.resize(rf_coeff.size() - 1);
+	state_q_lpf_100k.resize(rf_coeff.size() - 1);
 
   // demodulation variables
 	std::vector<float> demod_state;
@@ -132,9 +113,7 @@ void process_block_stream(int mode){
 
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
-    auto t_start_time = std::chrono::high_resolution_clock::now();
 		std::vector<float> block_data(block_size);
-    start_time = std::chrono::high_resolution_clock::now();
     readStdinBlockData(block_size, block_data);
     if ((std::cin.rdstate()) != 0) {
       std::cerr << "End of input stream reached" << std::endl;
@@ -143,13 +122,13 @@ void process_block_stream(int mode){
       stop_time = std::chrono::high_resolution_clock::now();
 		  std::chrono::duration<double, std::milli> OVERALL_run_time = stop_time-start_overall_time;
 		  std::cerr << "OVERALL RUNTIME: " << OVERALL_run_time.count() << " ms" << "\n";
-      std::cerr << "RF FRONTEND RUNTIME: " << RF_run_time.count() << " ms" << "\n";
+      std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
       std::cerr << "TOTAL MONOPATH RUNTIME: " << MONO_run_time.count() << " ms" << "\n";
       std::cerr << "TOTAL MONOPATH: " << total << "\n";
       exit(1);
     }
 
-    std::cerr << "Processing Block " << block_id << std::endl;
+    //std::cerr << "Processing block " << block_id << std::endl;
 
 		// STEP 1: IQ samples demodulation
     // take IQ data in
@@ -159,31 +138,22 @@ void process_block_stream(int mode){
     }
 
     // filter out IQ data with convolution and downsample
-    i_ds.clear();
-    q_ds.clear();
+    start_time = std::chrono::high_resolution_clock::now();
 		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim,i_ds);
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
-
-		// perform demodulation on IQ data
-		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     RF_run_time += stop_time-start_time;
 
+		// perform demodulation on IQ data
+		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
+
 		// STEP 2: Mono path
     start_time = std::chrono::high_resolution_clock::now();
-    //std::vector<float> audio_block = mono_path(mode, audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
-
-    audio_block.clear();
-    if (mode == 0 || mode == 1)
-      ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
-
-    else
-      rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
-
+    std::vector<float> audio_block = mono_path(mode, audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp);
     total += 1;
-    //break;
+    break;
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     MONO_run_time += stop_time-start_time;
@@ -200,10 +170,6 @@ void process_block_stream(int mode){
       }
     }
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
-    auto t_stop_time = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double, std::milli> t_run_time = t_stop_time-t_start_time;
-    std::cerr << "BLOCK RUNTIME: " << t_run_time.count() << " ms" << "\n\n";
-    //break;
 	}
 }
 

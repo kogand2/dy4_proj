@@ -28,7 +28,7 @@ void band_pass_coeff(float Fb, float Fe, float Fs, int num_taps, std::vector<flo
     else
       h[i] = normPass * (std::sin(PI*(normPass/2)*(i-((num_taps-1)/2))))/(PI*(normPass/2)*(i-((num_taps-1)/2)));
     h[i] = h[i] * std::cos(i*PI*normCenter);
-    h[i] = 2.5 * h[i] * pow(std::sin(i*PI/num_taps), 2);
+    h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
   }
 }
 
@@ -86,10 +86,9 @@ void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt
   mixedAudio.resize(channel_filt.size());
 
   for (int i = 0; i < channel_filt.size(); i++){
-    mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i]	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
+    mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i];	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
   }
 }
-<<<<<<< HEAD
 
 std::vector<float> stereo_path_main(int mode){
 	// TIMING VARIABLES
@@ -346,5 +345,3 @@ int main(int argc, char* argv[])
 
 	return 0;
 }
-=======
->>>>>>> 053f26627ab76c199cdca6eb75671c38cbf867f3

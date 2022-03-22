@@ -61,14 +61,14 @@ void process_block_stream(int mode){
       rf_decim = 10;
       audio_exp = 147;
       audio_decim = 800;
-      block_size = audio_decim*rf_decim*10;
+      block_size = 102400;
       break;
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
       audio_exp = 441;
       audio_decim = 2560;
-      block_size = audio_decim*rf_decim*10/3;
+      block_size = 102400;
       break;
   }
 
@@ -97,28 +97,33 @@ void process_block_stream(int mode){
 
   // filtered IQ data
   std::vector<float> i_filt;
+  i_filt.resize(i_data.size());
 	std::vector<float> q_filt;
+  q_filt.resize(q_data.size());
 
   // downsampled filtered IQ data
   std::vector<float>i_ds;
-  i_ds.reserve(i_filt.size()/rf_decim);
+  i_ds.resize(i_filt.size()/rf_decim);
   std::vector<float>q_ds;
-  q_ds.reserve(q_filt.size()/rf_decim);
+  q_ds.resize(q_filt.size()/rf_decim);
 
+  // state saving variables for I and Q samples convolution
+  std::vector<float> state_i_lpf_100k;
+  std::vector<float> state_q_lpf_100k;
+  state_i_lpf_100k.resize(rf_coeff.size() - 1);
+  state_q_lpf_100k.resize(rf_coeff.size() - 1);
+
+  // filtered audio data
+  std::vector<float> audio_filt;
+  audio_filt.resize(audio_exp*(i_ds.size() - 1));
+
+  // downsampled filtered audio data
   std::vector<float> audio_block;
+  audio_block.resize(audio_filt.size()/audio_decim);
 
   // state saving variable for audio data convolution
 	std::vector<float> audio_state;
   audio_state.resize(audio_coeff.size() - 1);
-
-  std::vector<float> audio_filt;
-  audio_filt.resize(audio_exp*block_size/rf_decim, 0.0);
-
-  // state saving variables for I and Q samples convolution
-	std::vector<float> state_i_lpf_100k;
-	std::vector<float> state_q_lpf_100k;
-	state_i_lpf_100k.resize(rf_coeff.size() - 1);
-	state_q_lpf_100k.resize(rf_coeff.size() - 1);
 
   // demodulation variables
 	std::vector<float> demod_state;
@@ -172,34 +177,11 @@ void process_block_stream(int mode){
 
     audio_block.clear();
     if (mode == 0 || mode == 1)
-    {
-      // resample audio data
-      //auto start_time = std::chrono::high_resolution_clock::now();
-      //audio_block.reserve(audio_filt.size()/audio_decim);
       ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
 
-      // timing analysis
-      //auto stop_time = std::chrono::high_resolution_clock::now();
-      //std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-      //std::cerr << "MONO RESAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
-
-      // take downsampled filtered audio data
-      //downsample(audio_decim, audio_filt, audio_block);
-    }
-
-    else{
-      // filter out audio data with convolution
-      //auto start_time = std::chrono::high_resolution_clock::now();
-      //audio_block.reserve(audio_filt.size()/audio_decim);
+    else
       rs_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
 
-
-      // timing analysis
-      //auto stop_time = std::chrono::high_resolution_clock::now();
-      //std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-      //std::cerr << "MONO DOWNSAMPLE RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
-
-    }
     total += 1;
     //break;
     // timing analysis

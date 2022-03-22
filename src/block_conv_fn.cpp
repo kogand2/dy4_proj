@@ -16,7 +16,7 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   float Q_der;
   int j;
 
-  fm_demod.resize(I.size() - 1, float(0));
+  fm_demod.resize(I.size() - 1, 0.0);
 
   I_prev = dummy_state[0];
   Q_prev = dummy_state[1];
@@ -73,8 +73,8 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 {
 	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
-	y.clear();
-	y.resize(x.size()); // y of size i_data
+	//y.clear();
+	//y.resize(x.size(), 0.0); // y of size i_data
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
   //std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
@@ -82,7 +82,8 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
   int count = 0;
   //start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
-	for (int n = 0; n < y.size(); n += rf_decim){
+	for (int n = 0; n < x.size(); n += rf_decim){
+    y[n] = 0;
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
@@ -115,8 +116,8 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 {
 	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
-	y.clear();
-	y.resize(x.size()*audio_exp); // y of size i_data
+	//y.clear();
+	//y.resize(x.size()*audio_exp, 0.0); // y of size i_data
   int count = 0;
   int phase, x_index;
 
@@ -126,10 +127,10 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
-	for (int n = 0; n < y.size(); n += audio_decim){
+	for (int n = 0; n < x.size()*audio_exp; n += audio_decim){
     phase = n % audio_exp;
     x_index = (n - phase) / audio_exp;
-
+    y[n] = 0;
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
 				y[n] += audio_exp * h[k] * x[x_index];

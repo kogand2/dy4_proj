@@ -153,15 +153,22 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
   start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
 	for (int n = 0; n < x.size()*audio_exp; n += audio_decim){
+
     phase = n % audio_exp;
+
     x_index = (n - phase) / audio_exp;
+
     y[n] = 0;
+
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
-				y[n] += audio_exp * h[k] * x[x_index];
+
         //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << x_index << "]\n";
+				y[n] += audio_exp * h[k] * x[x_index];
+
       }
       else{
+
 				y[n] += audio_exp * h[k] * state[state.size() + x_index];
         //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  x_index << "]\n";
       }
@@ -169,7 +176,9 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
       count++;
     }
     down.push_back(y[n]);
+
   }
+
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;

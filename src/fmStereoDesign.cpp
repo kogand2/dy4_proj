@@ -100,11 +100,14 @@ void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<fl
 void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt, std::vector<float> &mixedAudio)
 {
   mixedAudio.clear();
-  mixedAudio.resize(channel_filt.size());
+//  mixedAudio.resize(channel_filt.size());
 
   for (int i = 0; i < channel_filt.size(); i++){
-    mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i];	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
+    mixedAudio.push_back(2 * recoveredStereo[i] * channel_filt[i]);	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
   }
+  std::cerr << mixedAudio.size() << "\n";
+  std::cerr << channel_filt.size() << "\n";
+  //exit(0);
 }
 
 std::vector<float> stereo_path_main(int mode){
@@ -153,7 +156,7 @@ std::vector<float> stereo_path_main(int mode){
   // audio path variables
 	float audio_Fc = 16000;
 	float audio_Fs = 48000;
-	int audio_taps = 151;
+	int audio_taps = 101;
 
 	std::vector<float> rf_coeff, carrier_coeff, channel_coeff, audio_coeff;
 
@@ -163,7 +166,7 @@ std::vector<float> stereo_path_main(int mode){
 	band_pass_coeff(22000, 54000, rf_Fs/rf_decim, audio_taps, channel_coeff);
 	low_pass_coeff((rf_Fs/rf_decim)*audio_exp, audio_Fc, audio_taps*audio_exp, audio_coeff);
 
-	float block_size = 1024*rf_decim*audio_decim*2;
+	float block_size = 102400;
 
   // demodulation variables
 	std::vector<float> demod_state;
@@ -171,10 +174,10 @@ std::vector<float> stereo_path_main(int mode){
 	demod_state.resize(2, 0.0);
 
 	std::vector<float> stereo_state, carrier_state, channel_state, mono_state, pll_state;
-	stereo_state.resize(carrier_coeff.size());		//For Stereo Processing
-	carrier_state.resize(carrier_coeff.size());	//For Stereo Carrier Recovery
-	channel_state.resize(channel_coeff.size());	//For Stereo Channel Extraction
-	mono_state.resize(audio_coeff.size());		  //For Monopath
+	stereo_state.resize(carrier_coeff.size() - 1);		//For Stereo Processing
+	carrier_state.resize(carrier_coeff.size() - 1);	//For Stereo Carrier Recovery
+	channel_state.resize(channel_coeff.size() - 1);	//For Stereo Channel Extraction
+	mono_state.resize(audio_coeff.size() - 1);		  //For Monopath
 
   // might have to change block size
 	std::vector<float> left_block, right_block, delay_block;
@@ -236,7 +239,7 @@ std::vector<float> stereo_path_main(int mode){
   std::vector<float> mixedAudio, stereo_filt, stereo_block;
 
   mixedAudio.resize(channel_filt.size());
-  stereo_filt.resize(mixedAudio.size());
+  stereo_filt.resize((mixedAudio.size()-1)*audio_exp);
 
 
 	std::vector<std::vector<float>> complete_data;
@@ -297,22 +300,28 @@ std::vector<float> stereo_path_main(int mode){
 		mixer(recoveredStereo, channel_filt, mixedAudio);
 
 
-		//std::cerr << "test 6" << "\n";
+
     stereo_block.clear();
-		ds_block_conv(stereo_filt, mixedAudio, audio_coeff, stereo_state, audio_decim, stereo_block);
+
+    if (mode == 0 || mode == 1)
+		  ds_block_conv(stereo_filt, mixedAudio, audio_coeff, stereo_state, audio_decim, stereo_block);
+    else
+      rs_block_conv(stereo_filt, mixedAudio, audio_coeff, stereo_state, audio_decim, audio_exp, stereo_block);
 
     all_pass_coeff(mono_input, IQ_demod, delay_block);
 
-    //std::cerr << "test 7" << "\n";
+
     audio_block.clear();
-    ds_block_conv(audio_filt, mono_input, audio_coeff, audio_state, audio_decim, audio_block);
+    if (mode == 0 || mode == 1)
+      ds_block_conv(audio_filt, mono_input, audio_coeff, audio_state, audio_decim, audio_block);
+    else
+      rs_block_conv(audio_filt, mono_input, audio_coeff, audio_state, audio_decim, audio_exp, audio_block);
 
     //printRealVector(audio_block);
     //exit(0);
 
 		std::vector<float> index;
 
-    std::cerr << "test1\n";
     complete_data.clear();
 		for (int i = 0; i < audio_block.size(); i++){
       //std::cerr << "test 9" << "\n";

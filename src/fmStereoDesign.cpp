@@ -13,6 +13,13 @@
 // testing time complexity
 #include <chrono>
 
+void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
+  std::vector<char> raw_data(num_samples);
+  std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
+  for(int k = 0; k < (int)num_samples; k++) {
+    block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
+  }
+}
 
 void band_pass_coeff(float Fb, float Fe, float Fs, int num_taps, std::vector<float> &h)
 {
@@ -76,7 +83,7 @@ void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<fl
 		state[1] = phaseEst;
 		state[2] = feedbackI;
 		state[3] = feedbackQ;
-		state[4] = ncoOut[-1];
+		state[4] = ncoOut[ncoOut.size() - 1];
 		state[5] = trigOffset;
 }
 
@@ -151,10 +158,6 @@ std::vector<float> stereo_path_main(int mode){
 
 	float block_size = 1024*rf_decim*audio_decim*2;
 
-  // filtered data
-  std::vector<float> i_filt;
-	std::vector<float> q_filt;
-
   // demodulation variables
 	std::vector<float> demod_state;
 	std::vector<float> IQ_demod;
@@ -187,17 +190,47 @@ std::vector<float> stereo_path_main(int mode){
 
 	//audio buffer that stores all the audio blocks
 	std::vector<float> audio_data, stereo_data, left_data, right_data;
-	std::vector<float> carrier_filt, dummy_fm, channel_filt, down_carrier, down_channel, recoveredStereo, down_stereo;
+	std::vector<float> carrier_filt, dummy_fm, channel_filt, down_carrier, down_channel, recoveredStereo;
 
 	// STEP 1: IQ samples demodulation
 	std::vector<float> i_data(block_size / 2);
 	std::vector<float> q_data(block_size / 2);
 
+  // filtered IQ data
+  std::vector<float> i_filt;
+  i_filt.resize(i_data.size());
+  std::vector<float> q_filt;
+  q_filt.resize(q_data.size());
+
+  // take downsampled filtered IQ data
+  std::vector<float>i_ds;
+  i_ds.resize(i_filt.size()/rf_decim);
+  std::vector<float>q_ds;
+  q_ds.resize(q_filt.size()/rf_decim);
+
 	carrier_filt.resize(i_data.size());
 	channel_filt.resize(i_data.size());
 
-	std::vector<std::vector<float>> complete_data;
+  // filtered audio data
+  std::vector<float> audio_filt;
+  audio_filt.resize(audio_exp*(i_ds.size() - 1));
 
+  // downsampled filtered audio data
+  std::vector<float> audio_block;
+  audio_block.resize(audio_filt.size()/audio_decim);
+
+  // state saving variable for audio data convolution
+  std::vector<float> audio_state;
+  audio_state.resize(audio_coeff.size() - 1);
+
+  std::vector<float> mixedAudio, stereo_filt, stereo_block;
+
+  mixedAudio.resize(channel_filt.size());
+  stereo_filt.resize(mixedAudio.size());
+
+
+	std::vector<std::vector<float>> complete_data;
+	//std::cerr << "test 5" << "\n";
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
 		std::vector<float> block_data(block_size);
@@ -214,6 +247,8 @@ std::vector<float> stereo_path_main(int mode){
       exit(1);
     }
 
+    std::cerr << "Processing Block " << block_id << std::endl;
+
 		for (int k = 0; k < block_size / 2; k++) {
       i_data[k] = block_data[2*k];
       q_data[k] = block_data[2*k + 1];
@@ -221,12 +256,8 @@ std::vector<float> stereo_path_main(int mode){
 
     // filter out IQ data with convolution
     start_time = std::chrono::high_resolution_clock::now();
-    // take downsampled filtered IQ data
-		std::vector<float>i_ds;
-    i_ds.resize(i_filt.size()/rf_decim);
-		std::vector<float>q_ds;
-    q_ds.resize(q_filt.size()/rf_decim);
-
+    i_ds.clear();
+    q_ds.clear();
 		ds_block_conv(i_filt,i_data,rf_coeff,state_i_lpf_100k,rf_decim,i_ds);
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
 
@@ -243,47 +274,41 @@ std::vector<float> stereo_path_main(int mode){
 
 		//Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled
 		const std::vector<float> x;
-		std::cerr << "test 8" << "\n";
+		//std::cerr << "test 8" << "\n";
+    down_carrier.clear();
 		ds_block_conv(carrier_filt, IQ_demod, carrier_coeff, carrier_block, rf_decim, down_carrier);
-		std::cerr << "test 9" << "\n";
+		//std::cerr << "test 9" << "\n";
 		fmPll(carrier_filt, recoveredStereo, pll_block, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01);
-		std::cerr << "test 5" << "\n";
+		//std::cerr << "test 5" << "\n";
 
     //Stereo Channel Extraction: Bandpass
+    down_channel.clear();
 		ds_block_conv(channel_filt, IQ_demod, channel_coeff, channel_block, rf_decim, down_channel);
 
     //Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
-		std::vector<float> mixedAudio, stereo_filt, stereo_block;
-		mixer(recoveredStereo, channel_filt, mixedAudio);
-		std::cerr << "test 6" << "\n";
 
-		ds_block_conv(stereo_filt, mixedAudio, audio_coeff, filt_block, rf_decim, down_stereo);
-
-		for (int i = 0; i < stereo_filt.size(); i+=audio_decim){
-			stereo_block.push_back(stereo_filt[i]);
-		}
-
-		//extract the mono audio data
-		std::vector<float> audio_filt, audio_block;
-
-		// state saving variable for audio data convolution
-		std::vector<float> audio_state;
-		audio_state.resize(audio_coeff.size() - 1, 0.0);
-
+		mixer(recoveredStereo, down_channel, mixedAudio);
+		//std::cerr << "test 6" << "\n";
+    stereo_block.clear();
+		ds_block_conv(stereo_filt, mixedAudio, audio_coeff, filt_block, rf_decim, stereo_block);
+    //std::cerr << "test 7" << "\n";
+    audio_block.clear();
     ds_block_conv(audio_filt, IQ_demod, audio_coeff, audio_state, audio_decim, audio_block);
-		audio_block.reserve(audio_filt.size()/audio_decim);
-
+    //std::cerr << "test 8" << "\n";
 		std::vector<float> index;
 
 		for (int i = 0; i < audio_block.size(); i++){
-			index.clear();
-			left_block[i] = audio_block[i] + stereo_block[i];
-			right_block[i] = audio_block[i] - stereo_block[i];
-			index.push_back(left_block[i]);
-			index.push_back(right_block[i]);
+      //std::cerr << "test 9" << "\n";
+			float left_block = audio_block[i] + stereo_block[i];
+			float right_block = audio_block[i] - stereo_block[i];
+      //std::cerr << "test 10" << "\n";
+			index.push_back(left_block);
+			index.push_back(right_block);
+      //std::cerr << "test 11" << "\n";
 			complete_data.push_back(index);
+      index.clear();
 		}
-
+    //std::cerr << "test 9" << "\n";
 		//left_data.insert(left_data.end(), left_block.begin(), left_block.end());
 		//right_data.insert(right_data.end(), right_data.begin(), right_data.end());
 
@@ -309,6 +334,7 @@ std::vector<float> stereo_path_main(int mode){
 				audio_data.push_back(complete_block);
       }
     }
+    //std::cerr << "test 10" << "\n";
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
 
 	}

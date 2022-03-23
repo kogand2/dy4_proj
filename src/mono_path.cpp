@@ -11,13 +11,13 @@
 #include <chrono>
 
 // read in raw block data
-void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
+/*void readStdinBlockData(unsigned int num_samples, std::vector<float> &block_data){
   std::vector<char> raw_data(num_samples);
   std::cin.read(reinterpret_cast<char*>(&raw_data[0]), num_samples*sizeof(char));
   for(int k = 0; k < (int)num_samples; k++) {
     block_data[k] = float(((unsigned char)raw_data[k] - 128)/ 128.0);
   }
-}
+}*/
 
 // dowsampling function
 void downsample(int D, std::vector<float> input, std::vector<float> &down)

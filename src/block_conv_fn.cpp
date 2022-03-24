@@ -48,40 +48,131 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   return fm_demod;
 }
 
-// Filter coefficient function
+// LPF coefficient function
 void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 {
 	// allocate memory for the impulse response
-	//h.clear();
 	h.resize(num_taps, 0.0);
 
 	float norm_co = Fc/(Fs/2);
 
-	// the rest of the code in this function is to be completed by you
-	// based on your understanding and the Python code from the first lab
 	for (int i = 0; i < num_taps; i++){
 			if (i == (num_taps-1)/2)
 		    h[i] = norm_co;
 			else
 			  h[i] = norm_co * (std::sin(PI*norm_co*(i-((num_taps-1)/2))))/(PI*norm_co*(i-((num_taps-1)/2)));
-			h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
+
+      h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
 	}
+}
+
+// BPF coefficient function
+void band_pass_coeff(float Fb, float Fe, float Fs, int num_taps, std::vector<float> &h)
+{
+  h.clear();
+  h.resize(num_taps, 0.0);
+
+  float normCenter = ((Fe + Fb)/2)/(Fs/2);
+	float normPass = (Fe - Fb)/(Fs/2);
+
+  for (int i = 0; i < num_taps; i++){
+    if (i == (num_taps-1)/2)
+      h[i] = normPass;
+    else
+      h[i] = normPass * (std::sin(PI*(normPass/2)*(i-((num_taps-1)/2))))/(PI*(normPass/2)*(i-((num_taps-1)/2)));
+
+    h[i] = h[i] * std::cos(i*PI*normCenter);
+    h[i] = h[i] * pow(std::sin(i*PI/num_taps), 2);
+  }
+}
+
+// APF coefficient function
+void all_pass_coeff(std::vector<float> &y,std::vector<float> &x, std::vector<float> &all_pass_state)
+{
+  y.clear();
+  y = all_pass_state;
+  std::vector<float> curr_state = std::vector<float>(x.begin(), x.end() - all_pass_state.size());
+  y.insert(y.end(), curr_state.begin(), curr_state.end());
+
+  all_pass_state = std::vector<float>(x.begin() + x.size() - all_pass_state.size(), x.end());
+}
+
+// FM PLL function
+void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<float> &state, float freq, float Fs, float ncoScale = 2.0, float phaseAdjust = 0.0, float normBandwidth = 0.01)
+{
+    float Cp = 2.666;
+    float Ci = 3.555;
+
+    float Kp = normBandwidth*Cp;
+    float Ki = normBandwidth*normBandwidth*Ci;
+
+    ncoOut.clear();
+  	ncoOut.resize(pllIn.size()+1);
+
+    float integrator = state[0];
+  	float phaseEst = state[1];
+  	float feedbackI = state[2];
+  	float feedbackQ = state[3];
+  	ncoOut[0] = state[4];
+  	float trigOffset = state[5];
+
+		float errorI, errorQ, errorD, trigArg;
+
+    for (int k = 0; k < pllIn.size(); k++){
+      errorI = pllIn[k] * (+feedbackI);  //complex conjugate of the
+  		errorQ = pllIn[k] * (-feedbackQ);  //feedback complex exponential
+
+  		//four-quadrant arctangent discriminator for phase error detection
+  		errorD = std::atan2(errorQ, errorI);
+
+  		//loop filter
+  		integrator = integrator + (Ki*errorD);
+
+  		//update phase estimate
+  		phaseEst = phaseEst + (Kp*errorD) + integrator;
+
+  		//internal oscillator
+  		trigOffset += 1.0;
+  		trigArg = (2*PI*(freq/Fs)*(trigOffset) + phaseEst);
+  		feedbackI = std::cos(trigArg);
+  		feedbackQ = std::sin(trigArg);
+  		ncoOut[k+1] = std::cos(trigArg*ncoScale + phaseAdjust);
+    }
+    state[0] = integrator;
+		state[1] = phaseEst;
+		state[2] = feedbackI;
+		state[3] = feedbackQ;
+		state[4] = ncoOut[ncoOut.size() - 1];
+		state[5] = trigOffset;
+}
+
+// mixer function
+void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt, std::vector<float> &mixedAudio)
+{
+  mixedAudio.clear();
+//  mixedAudio.resize(channel_filt.size());
+
+  for (int i = 0; i < channel_filt.size(); i++){
+    mixedAudio.push_back(2 * recoveredStereo[i] * channel_filt[i]);	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
+  }
 }
 
 // convolution with no downsampling
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {
-	// allocate memory for the output (filtered) data
-	y.clear();
+  // FOR NOW
+  y.clear();
 	y.resize(x.size(), 0.0);
 
 	// implement block processing algorithm discussed in lecture and used in python
 	for (int n = 0; n < y.size(); n++){
+    y[n] = 0;
 		for (int k = 0; k < h.size(); k++){
 			if (n-k >= 0){
 				y[n] += h[k] * x[n - k];
         //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << n - k << "]\n";
-			}else{
+			}
+      else{
 				y[n] += h[k] * state[state.size() + n - k];
         //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  n - k << "]\n";
       }
@@ -96,10 +187,7 @@ void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const 
 // block convolution function (with downsampling)
 void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std::vector<float> h, std::vector<float> &state, int rf_decim, std::vector<float> &down)
 {
-	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
-	//y.clear();
-	//y.resize(x.size(), 0.0); // y of size i_data
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
   //std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
@@ -139,16 +227,13 @@ void ds_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 // block convolution function (with resampling)
 void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std::vector<float> h, std::vector<float> &state, int audio_decim, int audio_exp, std::vector<float> &down)
 {
-	// allocate memory for the output (filtered) data
   auto start_time = std::chrono::high_resolution_clock::now();
-	//y.clear();
-	//y.resize(x.size()*audio_exp, 0.0); // y of size i_data
   int count = 0;
   int phase, x_index;
 
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> SFT_run_time = stop_time-start_time;
-  std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
+  //std::cerr << "PREP RUNTIME: " << SFT_run_time.count() << " ms" << "\n";
 
   start_time = std::chrono::high_resolution_clock::now();
   // only compute the values we need (because of downsampling)
@@ -182,15 +267,15 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
-  std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
+  //std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
 
   start_time = std::chrono::high_resolution_clock::now();
 
-  std::cerr << "rs: " << count << "\n";
+  //std::cerr << "rs: " << count << "\n";
   int index = x.size() - h.size()/audio_exp + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
 
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
-  std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
+  //std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }

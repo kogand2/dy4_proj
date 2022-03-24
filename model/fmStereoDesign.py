@@ -68,10 +68,10 @@ def block_convolution(h, xb, state):
 				yb[n] += h[k] * xb[n-k]
 			else:
 				yb[n] += h[k] * state[stateLen + (n - k)]
-	#print(stateLen)
 	#print(len(xb))
+	#print(len(xb[len(xb) - len(h) + 1:]))
 	#print(len(h))
-	new_state = xb[len(xb) - len(h) + 1:]
+	new_state = xb[len(xb) - len(h):]
 
 	return yb, new_state
 
@@ -312,20 +312,15 @@ if __name__ == "__main__":
 
 
 		for i in range(len(audio_block)):
-			left_block[i] = 4095*(audio_block[i] + stereo_block[i])
+			left_block[i] = (audio_block[i] + stereo_block[i])
 			#print("Left Block [" + str(i) + "] = " + str(left_block[i]*4095))
-			right_block[i] = 4095*(audio_block[i] - stereo_block[i])
+			right_block[i] = (audio_block[i] - stereo_block[i])
 			#print("Right Block [" + str(i) + "] = " + str(right_block[i]*4095))
 
 
 
 		left_data = np.concatenate((left_data, left_block))
 		right_data = np.concatenate((right_data, right_block))
-		complete_data = np.vstack((left_data, right_data)).T
-
-		if (block_count == 2):
-			print(complete_data)
-			quit()
 
 		#Generate Plots of PLL
 		#if block_count >= 3 and block_count < 6:
@@ -345,25 +340,29 @@ if __name__ == "__main__":
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			#print(len(mono_input))
+			#print("hello")
 			#print(len(audio_filt))
 			x1 = range(50)
 			x2 = range(50)
-			fig2, axs = plt.subplots(2)
-			fig2.suptitle('Mono Path checking')
-			axs[0].plot(range(49,99), mono_input[:50], c='blue')
-			axs[0].plot(x2, prevMono[5070:], c='orange')
-			axs[0].set_title('Allpass filter', fontstyle='italic',fontsize='medium')
-			plt.axvline(x=50)
+			fig2, axs = plt.subplots(3)
+			fig2.suptitle('State saving checking')
+			axs[0].plot(range(50,100), stereo_filt[:50], c='blue')
+			axs[0].plot(x2, prevFilter[5070:], c='orange')
+			axs[0].set_title('Stereo path', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(49,99), audio_filt[:50], c='blue')
-			axs[1].plot(x1, prevFilter[5070:], c='orange')
-			axs[1].set_title('Lowpass filter', fontstyle='italic',fontsize='medium')
-			plt.axvline(x=50)
+			axs[1].plot(range(50,100), audio_filt[:50], c='blue')
+			axs[1].plot(x1, prevMono[5070:], c='orange')
+			axs[1].set_title('Mono path', fontstyle='italic',fontsize='medium')
+
+			axs[2].plot(range(49,99), recoveredStereo[:50], c='blue')
+			axs[2].plot(x1, prevStereo[5071:], c='orange')
+			axs[2].set_title('PLL', fontstyle='italic',fontsize='medium')
+
 			plt.show()
-		prevMono = mono_input
-		prevFilter = audio_filt
 
+		prevMono = audio_filt
+		prevFilter = stereo_filt
+		prevStereo = recoveredStereo
 
 		if block_count >= 10 and block_count < 12:
 

@@ -31,8 +31,9 @@ import math, cmath
 # IQ samples; then unwrap the phase and take its derivative to demodulate
 #
 
+#======================================= Demodualtion for RL =======================================
+
 def fmDemodArctan(I, Q, prev_phase = 0):
-#
 # the default prev_phase phase is assumed to be zero, however
 # take note in block processing it must be explicitly controlled
 
@@ -84,11 +85,190 @@ def myDemod(I, Q, dummy_state):
 			fm_demod[j] = fm_demod[j]/(newQ[j+1]**2 + newI[j+1]**2)
 		else:
 			fm_demod[j] = 0
-	dummy_state = np.array([I[5119],Q[5119]])
+	dummy_state = np.array([I[j],Q[j]])
 	#print(dummy_state)
 	return fm_demod, dummy_state
 # custom function for DFT that can be used by the PSD estimate
 
+#======================================= filters =======================================
+def myLowPass(fc, fs, Ntaps):
+	normCutoff = fc/(fs/2)
+	h = np.zeros(Ntaps)
+	for i in range(Ntaps):
+		if (i==(Ntaps-1)/2):
+			h[i] = normCutoff
+		else:
+			h[i] = normCutoff*(math.sin(np.pi*normCutoff*(i-(Ntaps-1)/2)))/(np.pi*normCutoff*(i-(Ntaps-1)/2))
+		h[i] = h[i]*(math.sin(i*np.pi/Ntaps))**2
+
+	return  h
+
+def myBandPass(fb, fe, fs, Ntaps):
+	normCenter = ((fe + fb)/2)/(fs/2)
+	normPass = (fe - fb)/(fs/2)
+	h = np.zeros(Ntaps)
+
+	for i in range(Ntaps):
+		if (i==(Ntaps-1)/2):
+			h[i] = normPass # avoid division by zero in sinc for the center tap when Ntaps is odd
+		else:
+			h[i] = normPass*((math.sin(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))/(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))
+		h[i] = h[i]*(math.cos(i*np.pi*normCenter))
+		h[i] = h[i]*((math.sin(i*np.pi/Ntaps))**2)
+
+	return  h
+
+def myAllPass(input_block, state_block):
+
+	output_block = np.concatenate((state_block, input_block[:-len(state_block)]))
+	state_block = input_block[-len(state_block):]
+
+	return output_block, state_block
+
+#======================================= Convolution and sampling =======================================
+
+def block_convolution(h, x, state): #Edits made from Feb 10, partitioned design
+	y = np.zeros(len(x))
+	stateLen = len(state)
+
+	for n in range(len(h)): #lead in
+		y[n] = 0.0
+		for k in range(len(h)):
+			if (n-k) >= 0:
+				y[n] += x[n-k]*h[k]
+
+	n = len(h)
+	while n < len(x):		#dominant partition
+		y[n] = 0.0
+		for k in range(len(h)):
+			y[n] += x[n-k]*h[k]
+		n += 1
+
+	n = len(x)
+	while n < len(y):		#lead out
+		y[n] = 0.0
+		for k in range(len(h)):
+			if (n-k) < len(x):
+				y[n] += x[n-k]*h[k]
+		n += 1
+
+	new_state = x[len(x) - len(h) + 1:]
+
+	return y, new_state
+
+def ds_block_convolution(h, x, state, decim):
+	y = np.zeros(len(x))
+	down =  np.array([])
+	stateLen = len(state)
+
+	#count = 0;
+
+	for n in range(0, len(x), decim):		#dominant partition
+		y[n] = 0.0
+		for k in range(len(h)):
+			if (n-k) >= 0:
+				y[n] += x[n-k]*h[k]
+			else:
+				y[n] += state[stateLen + n - k]*h[k]
+			#count++
+		down = np.append(down, y[n])
+
+	new_state = x[len(x) - len(h) + 1:]
+
+	return down, new_state
+
+#======================================= Stereo path =======================================
+
+def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):
+
+	"""
+	pllIn 	 		array of floats
+					input signal to the PLL (assume known frequency)
+
+	freq 			float
+					reference frequency to which the PLL locks
+
+	Fs  			float
+					sampling rate for the input/output signals
+
+	ncoScale		float
+					frequency scale factor for the NCO output
+
+	phaseAdjust		float
+					phase adjust to be added to the NCO output only
+
+	normBandwidth	float
+					normalized bandwidth for the loop filter
+					(relative to the sampling rate)
+
+	state 			to be added
+
+	"""
+
+	# scale factors for proportional/integrator terms
+	# these scale factors were derived assuming the following:
+	# damping factor of 0.707 (1 over square root of 2)
+	# there is no oscillator gain and no phase detector gain
+	Cp = 2.666
+	Ci = 3.555
+
+	# gain for the proportional term
+	Kp = (normBandwidth)*Cp
+	# gain for the integrator term
+	Ki = (normBandwidth*normBandwidth)*Ci
+
+	# output array for the NCO
+	ncoOut = np.empty(len(pllIn)+1)
+
+	# initialize internal state
+	integrator = state[0]
+	phaseEst = state[1]
+	feedbackI = state[2]
+	feedbackQ = state[3]
+	ncoOut[0] = state[4]
+	trigOffset = state[5]
+	# note: state saving will be needed for block processing
+
+
+	for k in range(len(pllIn)):
+
+		# phase detector
+		errorI = pllIn[k] * (+feedbackI)  # complex conjugate of the
+		errorQ = pllIn[k] * (-feedbackQ)  # feedback complex exponential
+
+		# four-quadrant arctangent discriminator for phase error detection
+		errorD = math.atan2(errorQ, errorI)
+
+		# loop filter
+		integrator = integrator + Ki*errorD
+
+		# update phase estimate
+		phaseEst = phaseEst + Kp*errorD + integrator
+
+
+		# internal oscillator
+		trigOffset += 1.0
+		trigArg = (2*np.pi*(freq/Fs)*(trigOffset) + phaseEst)
+		feedbackI = math.cos(trigArg)
+		feedbackQ = math.sin(trigArg)
+		ncoOut[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
+	#print(trigOffset)
+	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOut[-1], trigOffset]
+
+	# for stereo only the in-phase NCO component should be returned
+	# for block processing you should also return the state
+	#print(ncoOut)
+	return ncoOut, new_state
+	# for RDS add also the quadrature NCO component to the output
+
+def mixer(recoveredStereo, channel_filt):
+	mixedAudio = np.empty(len(channel_filt))
+	for i in range(len(channel_filt)):
+		mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i]	#this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
+																					#could prob automatically be done using the filter code from mono (???)
+	return mixedAudio
+
+#======================================= from lab 3 =======================================
 def DFT(x):
 
 	# number of samples

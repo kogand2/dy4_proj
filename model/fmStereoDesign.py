@@ -14,155 +14,10 @@ import numpy as np
 import math
 
 # use fmDemodArctan and fmPlotPSD
-from fmSupportLib import fmDemodArctan, fmPlotPSD, myDemod
+from fmSupportLib import *
 #from fmMonoBlock import *
 # for take-home add your functions
-def myLowPass(fc, fs, Ntaps):
-	normCutoff = fc/(fs/2)
-	h = np.zeros(Ntaps)
-	for i in range(Ntaps):
-		if (i==(Ntaps-1)/2):
-			h[i] = normCutoff
-		else:
-			h[i] = normCutoff*(math.sin(np.pi*normCutoff*(i-(Ntaps-1)/2)))/(np.pi*normCutoff*(i-(Ntaps-1)/2))
-		h[i] = h[i]*(math.sin(i*np.pi/Ntaps))**2
 
-	return  h
-
-def myBandPass(fb, fe, fs, Ntaps):
-	normCenter = ((fe + fb)/2)/(fs/2)
-	normPass = (fe - fb)/(fs/2)
-	h = np.zeros(Ntaps)
-
-	for i in range(Ntaps):
-		if (i==(Ntaps-1)/2):
-			h[i] = normPass # avoid division by zero in sinc for the center tap when Ntaps is odd
-		else:
-			h[i] = normPass*((math.sin(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))/(np.pi*(normPass/2)*(i-(Ntaps-1)/2)))
-		h[i] = h[i]*(math.cos(i*np.pi*normCenter))
-		h[i] = h[i]*((math.sin(i*np.pi/Ntaps))**2)
-
-	return  h
-
-def myAllPass(input_block, state_block):
-	#print(len(input_block))
-	#print(len(state_block))
-	#print(input_block)
-	#print(state_block)
-
-	output_block = np.concatenate((state_block, input_block[:-len(state_block)]))
-	state_block = input_block[-len(state_block):]
-
-	#print(output_block)
-	#print(len(output_block))
-
-	return output_block, state_block
-
-def block_convolution(h, xb, state):
-	yb = np.zeros(len(xb))
-	stateLen = len(state)
-
-	for n in range(len(yb)):
-		for k in range(len(h)):
-			if n-k >= 0:
-				yb[n] += h[k] * xb[n-k]
-			else:
-				yb[n] += h[k] * state[stateLen + (n - k)]
-	#print(len(xb))
-	#print(len(xb[len(xb) - len(h) + 1:]))
-	#print(len(h))
-	new_state = xb[len(xb) - len(h):]
-
-	return yb, new_state
-
-def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):
-
-	"""
-	pllIn 	 		array of floats
-					input signal to the PLL (assume known frequency)
-
-	freq 			float
-					reference frequency to which the PLL locks
-
-	Fs  			float
-					sampling rate for the input/output signals
-
-	ncoScale		float
-					frequency scale factor for the NCO output
-
-	phaseAdjust		float
-					phase adjust to be added to the NCO output only
-
-	normBandwidth	float
-					normalized bandwidth for the loop filter
-					(relative to the sampling rate)
-
-	state 			to be added
-
-	"""
-
-	# scale factors for proportional/integrator terms
-	# these scale factors were derived assuming the following:
-	# damping factor of 0.707 (1 over square root of 2)
-	# there is no oscillator gain and no phase detector gain
-	Cp = 2.666
-	Ci = 3.555
-
-	# gain for the proportional term
-	Kp = (normBandwidth)*Cp
-	# gain for the integrator term
-	Ki = (normBandwidth*normBandwidth)*Ci
-
-	# output array for the NCO
-	ncoOut = np.empty(len(pllIn)+1)
-
-	# initialize internal state
-	integrator = state[0]
-	phaseEst = state[1]
-	feedbackI = state[2]
-	feedbackQ = state[3]
-	ncoOut[0] = state[4]
-	trigOffset = state[5]
-	# note: state saving will be needed for block processing
-
-
-	for k in range(len(pllIn)):
-
-		# phase detector
-		errorI = pllIn[k] * (+feedbackI)  # complex conjugate of the
-		errorQ = pllIn[k] * (-feedbackQ)  # feedback complex exponential
-
-		# four-quadrant arctangent discriminator for phase error detection
-		errorD = math.atan2(errorQ, errorI)
-
-		# loop filter
-		integrator = integrator + Ki*errorD
-
-		# update phase estimate
-		phaseEst = phaseEst + Kp*errorD + integrator
-
-
-		# internal oscillator
-		trigOffset += 1.0
-		trigArg = (2*np.pi*(freq/Fs)*(trigOffset) + phaseEst)
-		feedbackI = math.cos(trigArg)
-		feedbackQ = math.sin(trigArg)
-		ncoOut[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
-	#print(trigOffset)
-	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOut[-1], trigOffset]
-
-	# for stereo only the in-phase NCO component should be returned
-	# for block processing you should also return the state
-	#print(ncoOut)
-	return ncoOut, new_state
-	# for RDS add also the quadrature NCO component to the output
-
-def mixer(recoveredStereo, channel_filt): #Possible issues over here
-	mixedAudio = np.empty(len(channel_filt))
-	for i in range(len(channel_filt)):
-		mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i]	#this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
-																					#could prob automatically be done using the filter code from mono (???)
-	return mixedAudio
 
 rf_Fs = 2.4e6
 rf_Fc = 100e3
@@ -182,7 +37,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0_2400.raw"
+	in_fname = "../data/samples0.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -275,7 +130,8 @@ if __name__ == "__main__":
 		q_ds = q_filt[::rf_decim]
 
 		# you MUST have also "custom" state-saving for your own FM demodulator
-		dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
+		dummy_fm, state_phase = fmDemodArctan(i_ds, q_ds, prev_phase = state_phase)
+		#dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
 
 		#print(len(i_ds))
     #RF front end stops here==================================================
@@ -296,19 +152,12 @@ if __name__ == "__main__":
         #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
 		mixedAudio = mixer(recoveredStereo, channel_filt)
 
-		stereo_filt,filt_block = block_convolution(audio_coeff, mixedAudio, filt_block)
-
-		stereo_block = stereo_filt[::audio_decim]
+		stereo_block,filt_block = ds_block_convolution(audio_coeff, mixedAudio, filt_block, audio_decim)
 
 		# extract the mono audio data
 		mono_input, delay_block = myAllPass(dummy_fm, delay_block)
 
-
-
-		audio_filt,mono_block = block_convolution(mono_coeff, mono_input, mono_block)
-
-		audio_block = audio_filt[::audio_decim]
-
+		audio_block,mono_block = ds_block_convolution(audio_coeff, mono_input, mono_block, audio_decim)
 
 
 		for i in range(len(audio_block)):
@@ -341,17 +190,17 @@ if __name__ == "__main__":
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
 			#print("hello")
-			#print(len(audio_filt))
+			print(len(prevFilter[974:]))
 			x1 = range(50)
 			x2 = range(50)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(range(50,100), stereo_filt[:50], c='blue')
-			axs[0].plot(x2, prevFilter[5070:], c='orange')
+			axs[0].plot(range(50,100), stereo_block[:50], c='blue')
+			axs[0].plot(x2, prevFilter[974:], c='orange')
 			axs[0].set_title('Stereo path', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(50,100), audio_filt[:50], c='blue')
-			axs[1].plot(x1, prevMono[5070:], c='orange')
+			axs[1].plot(range(50,100), mono_block[:50], c='blue')
+			axs[1].plot(x1, prevMono[(len(prevMono)-50):], c='orange')
 			axs[1].set_title('Mono path', fontstyle='italic',fontsize='medium')
 
 			axs[2].plot(range(49,99), recoveredStereo[:50], c='blue')
@@ -360,8 +209,8 @@ if __name__ == "__main__":
 
 			plt.show()
 
-		prevMono = audio_filt
-		prevFilter = stereo_filt
+		prevMono = mono_block
+		prevFilter = stereo_block
 		prevStereo = recoveredStereo
 
 		if block_count >= 10 and block_count < 12:
@@ -393,7 +242,7 @@ if __name__ == "__main__":
 	complete_data = np.vstack((left_data, right_data)).T
 
 	# write audio data to file
-	out_fname = "../data/fmStereoLowerCoeff.wav"
+	out_fname = "../data/fmStereoOldDemod.wav"
 	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*4095))
 	print("Written audio samples to \"" + out_fname + "\" in signed 16-bit format")
 

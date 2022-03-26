@@ -48,6 +48,12 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   return fm_demod;
 }
 
+float unwrap(float previous_angle, float new_angle) {
+    float d = new_angle - previous_angle;
+    d = d > M_PI ? d - 2 * M_PI : (d < -M_PI ? d + 2 * M_PI : d);
+    return previous_angle + d;
+}
+
 std::vector<float> fmDemodArctan(std::vector<float> I, std::vector<float> Q, float &prev_phase)
 {
   std::vector<float> fm_demod;
@@ -56,17 +62,7 @@ std::vector<float> fmDemodArctan(std::vector<float> I, std::vector<float> Q, flo
   for (int k = 0; k < I.size(); k++){
     current_phase = std::atan2(Q[k], I[k]);
 
-    // unwrapping the angles here
-    if (abs(current_phase-prev_phase) > PI)
-    {
-      int i = 1;
-      while(abs(current_phase-prev_phase) > PI){
-        current_phase -= 2*i*PI;
-        i += 1;
-      }
-    }
-
-    fm_demod[k] = current_phase-prev_phase;
+    fm_demod[k] = unwrap(prev_phase, current_phase) - prev_phase;
 
     prev_phase = current_phase;
 

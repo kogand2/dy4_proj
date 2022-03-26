@@ -18,7 +18,6 @@ from fmSupportLib import *
 #from fmMonoBlock import *
 # for take-home add your functions
 
-
 rf_Fs = 2.4e6
 rf_Fc = 100e3
 rf_taps = 151
@@ -27,7 +26,7 @@ rf_decim = 10
 audio_Fs = 48e3
 audio_decim = 5
 audio_taps = 151
-audio_Fc = 16e3
+audio_Fc = 3e3
 # add other settings for audio, like filter taps, ...
 
 # flag that keeps track if your code is running for
@@ -37,7 +36,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/stereo_l0_r9.raw"
+	in_fname = "../data/samples0.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -47,26 +46,11 @@ if __name__ == "__main__":
 	# coefficients for the front-end low-pass filter
 	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
 
-	carrier_coeff = myBandPass(18.5e3, 19.5e3, rf_Fs/rf_decim, audio_taps) #For Stereo Carrier Recovery
+	carrier_coeff = myBandPass(113.5e3, 114.5e3, rf_Fs/rf_decim, audio_taps) #For Stereo Carrier Recovery
 
-	#th_coeff = signal.firwin(audio_taps, [18.5e3, 19.5e3], pass_zero=False, fs = rf_Fs/rf_decim) #For testing
-
-	#carrier_coeff1 = myLowPass(18.5e3, rf_Fs/rf_decim, audio_taps) #For mono path combination #For testing
-	#carrier_coeff2 = myLowPass(19.5e3, rf_Fs/rf_decim, audio_taps) #For mono path combination
-	#Low_Carrier_Coeff = np.subtract(carrier_coeff2,carrier_coeff1)
-
-	#x1 = range(151)
-	#fig2, axs = plt.subplots(3)
-	#fig2.suptitle('Coeff Checking')
-	#axs[0].plot(x1, carrier_coeff)
-	#axs[1].plot(x1, th_coeff)
-	#axs[2].plot(x1, Low_Carrier_Coeff)
-	#plt.show()
-
-	channel_coeff = myBandPass(22e3, 54e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
+	channel_coeff = myBandPass(54e3, 60e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
 
 	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
-	mono_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
 
 	# set up the subfigures for plotting
 	subfig_height = np.array([0.8, 2, 2, 1.6]) # relative heights of the subfigures
@@ -85,31 +69,19 @@ if __name__ == "__main__":
 	state_phase = 0
 
 	dummy_state = np.array([0,0])						#For RF Demondulation
-	filt_block = np.zeros(shape=len(audio_coeff))		#For Stereo Processing
-	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Stereo Carrier Recovery
-	channel_block = np.zeros(shape=len(channel_coeff))	#For Stereo Channel Extraction
-	mono_block = np.zeros(shape=len(mono_coeff))		#For Monopath
-
-	left_block = np.zeros(shape=1024)		#For Monopath
-	right_block = np.zeros(shape=1024)		#For Monopath
-	delay_block = np.zeros(shape=(audio_taps-1)//2)		
-
+	filt_block = np.zeros(shape=len(audio_coeff))		#For audio Processing
+	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Carrier Recovery
+	channel_block = np.zeros(shape=len(channel_coeff))	#For Channel Extraction
+	delay_block = np.zeros(shape=(audio_taps-1)//2)		#For All pass filter
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
 
-	prevStereo = np.zeros(shape=5121)
+	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
-
-	prevMono = np.zeros(shape=5120)
-	prevFilter = np.zeros(shape=5120)
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
-	stereo_data = np.array([])# used to concatenate filtered blocks (stereo data)
-
-	left_data = np.array([]) # used to concatenate filtered left blocks (audio data)
-	right_data = np.array([])# used to concatenate filtered right blocks (stereo data)
 
 	while (block_count+1)*block_size < len(iq_data):
 	#RF FRONT END==================================================
@@ -136,40 +108,30 @@ if __name__ == "__main__":
 		#print(len(i_ds))
     #RF front end stops here==================================================
 
-		# extract the stereo audio data
+		channel_filt, channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
 
-        #Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled Oscillator
-		carrier_filt, carrier_block = block_convolution(carrier_coeff, dummy_fm, carrier_block)
+		channel_Delay, delay_block = myAllPass(channel_filt, delay_block)
 
+		carrier_Input = sq_nonlinearity(channel_filt)
 
-		recoveredStereo, pll_block = fmPll(carrier_filt, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01, pll_block)
+		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
 
+		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 1.0, 0.0, 0.003, pll_block)
 
-        #Stereo Channel Extraction: Bandpass
-		channel_filt,channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
+		mixedAudio = mixer(recoveredRDS, channel_Delay)
+
+        #RDS Demodulation
+
 
 
         #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
-		mixedAudio = mixer(recoveredStereo, channel_filt)
 
-		stereo_block,filt_block = ds_block_convolution(audio_coeff, mixedAudio, filt_block, audio_decim)
+
+		#stereo_block,filt_block = ds_block_convolution(audio_coeff, mixedAudio, filt_block, audio_decim)
 
 		# extract the mono audio data
-		mono_input, delay_block = myAllPass(dummy_fm, delay_block)
-
-		audio_block,mono_block = ds_block_convolution(audio_coeff, mono_input, mono_block, audio_decim)
 
 
-		for i in range(len(audio_block)):
-			left_block[i] = (audio_block[i] + stereo_block[i])
-			#print("Left Block [" + str(i) + "] = " + str(left_block[i]*4095))
-			right_block[i] = (audio_block[i] - stereo_block[i])
-			#print("Right Block [" + str(i) + "] = " + str(right_block[i]*4095))
-
-
-
-		left_data = np.concatenate((left_data, left_block))
-		right_data = np.concatenate((right_data, right_block))
 
 		#Generate Plots of PLL
 		#if block_count >= 3 and block_count < 6:
@@ -181,38 +143,37 @@ if __name__ == "__main__":
 		#	axs[0].plot(x2, prevCarrier[5070:], c='orange')
 		#	axs[0].set_title('Carrier Input', fontstyle='italic',fontsize='medium')
 		#	axs[1].plot(x1, recoveredStereo[:50], c='blue')
-		############################	axs[1].plot(x1, prevStereo[5071:], c='orange')
+		############################	axs[1].plot(x1, prevPLL[5071:], c='orange')
 		#	axs[1].set_title('Carrier Output', fontstyle='italic',fontsize='medium')
 		#	plt.show()
-		#prevStereo = recoveredStereo
+		#prevPLL = recoveredStereo
 		#prevCarrier = carrier_filt
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			#print("hello")
-			print(len(prevFilter[974:]))
+			print(len(channel_Delay))
+			print(len(prev2[974:]))
 			x1 = range(50)
 			x2 = range(50)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(range(50,100), carrier_filt[:50], c='blue')
-			axs[0].plot(x2, prevFilter[(len(prevFilter)-50):], c='orange')
-			axs[0].set_title('carrier filt', fontstyle='italic',fontsize='medium')
+			axs[0].plot(range(50,100), channel_Delay[:50], c='blue')
+			axs[0].plot(x1, prev1[(len(prev1)-50):], c='orange')
+			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(50,100), channel_filt[:50], c='blue')
-			axs[1].plot(x1, prevMono[(len(prevMono)-50):], c='orange')
-			axs[1].set_title('channel filt', fontstyle='italic',fontsize='medium')
+			axs[1].plot(range(50,100), carrier_Input[:50], c='blue')
+			axs[1].plot(x1, prev2[(len(prev2)-50):], c='orange')
+			axs[1].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
 
-			axs[2].plot(range(49,99), recoveredStereo[:50], c='blue')
-			axs[2].plot(x1, prevStereo[5071:], c='orange')
+			axs[2].plot(range(49,99), recoveredRDS[:50], c='blue')
+			axs[2].plot(x1, prevPLL[5071:], c='orange')
 			axs[2].set_title('PLL', fontstyle='italic',fontsize='medium')
 
 			plt.show()
 
-		prevFilter = carrier_filt
-		prevMono = channel_filt
-
-		prevStereo = recoveredStereo
+		prev1 = channel_Delay
+		prev2 = carrier_Input
+		prevPLL = recoveredRDS
 
 		if block_count >= 10 and block_count < 12:
 
@@ -243,8 +204,8 @@ if __name__ == "__main__":
 	complete_data = np.vstack((left_data, right_data)).T
 
 	# write audio data to file
-	out_fname = "../data/fmStereoTest2.wav"
-	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*8191))
+	out_fname = "../data/fmStereoOldDemod.wav"
+	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*4095))
 	print("Written audio samples to \"" + out_fname + "\" in signed 16-bit format")
 
 	# uncomment assuming you wish to show some plots

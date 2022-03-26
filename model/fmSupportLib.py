@@ -127,34 +127,20 @@ def myAllPass(input_block, state_block):
 
 #======================================= Convolution and sampling =======================================
 
-def block_convolution(h, x, state): #Edits made from Feb 10, partitioned design
-	y = np.zeros(len(x))
+def block_convolution(h, xb, state): #Edits made from Feb 10, partitioned design
+	yb = np.zeros(len(xb))
 	stateLen = len(state)
 
-	for n in range(len(h)): #lead in
-		y[n] = 0.0
+	for n in range(len(yb)):
 		for k in range(len(h)):
-			if (n-k) >= 0:
-				y[n] += x[n-k]*h[k]
+			if n-k >= 0:
+				yb[n] += h[k] * xb[n-k]
+			else:
+				yb[n] += h[k] * state[stateLen + (n - k)]
 
-	n = len(h)
-	while n < len(x):		#dominant partition
-		y[n] = 0.0
-		for k in range(len(h)):
-			y[n] += x[n-k]*h[k]
-		n += 1
+	new_state = xb[len(xb) - len(h) + 1:]
 
-	n = len(x)
-	while n < len(y):		#lead out
-		y[n] = 0.0
-		for k in range(len(h)):
-			if (n-k) < len(x):
-				y[n] += x[n-k]*h[k]
-		n += 1
-
-	new_state = x[len(x) - len(h) + 1:]
-
-	return y, new_state
+	return yb, new_state
 
 def ds_block_convolution(h, x, state, decim):
 	y = np.zeros(len(x))
@@ -177,7 +163,7 @@ def ds_block_convolution(h, x, state, decim):
 
 	return down, new_state
 
-#======================================= Stereo path =======================================
+#======================================= path specific =======================================
 
 def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):
 
@@ -267,6 +253,14 @@ def mixer(recoveredStereo, channel_filt):
 		mixedAudio[i] = 2 * recoveredStereo[i] * channel_filt[i]	#this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
 																					#could prob automatically be done using the filter code from mono (???)
 	return mixedAudio
+
+def sq_nonlinearity(signalIn):
+	signalLen = len(signalIn)
+	output = np.zeros(shape = signalLen)
+	for i in range(signalLen):
+		output[i] = signalIn[i]*signalIn[i]
+
+	return output #remember output will have a squared half amplitude and a positve offset of the same mag
 
 #======================================= from lab 3 =======================================
 def DFT(x):

@@ -37,7 +37,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0.raw"
+	in_fname = "../data/stereo_l0_r9.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -92,7 +92,7 @@ if __name__ == "__main__":
 
 	left_block = np.zeros(shape=1024)		#For Monopath
 	right_block = np.zeros(shape=1024)		#For Monopath
-	delay_block = np.zeros(shape=(audio_taps-1)//2)		#For Monopath
+	delay_block = np.zeros(shape=(audio_taps-1)//2)		
 
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
@@ -195,13 +195,13 @@ if __name__ == "__main__":
 			x2 = range(50)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(range(50,100), stereo_block[:50], c='blue')
-			axs[0].plot(x2, prevFilter[974:], c='orange')
-			axs[0].set_title('Stereo path', fontstyle='italic',fontsize='medium')
+			axs[0].plot(range(50,100), carrier_filt[:50], c='blue')
+			axs[0].plot(x2, prevFilter[(len(prevFilter)-50):], c='orange')
+			axs[0].set_title('carrier filt', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(50,100), mono_block[:50], c='blue')
+			axs[1].plot(range(50,100), channel_filt[:50], c='blue')
 			axs[1].plot(x1, prevMono[(len(prevMono)-50):], c='orange')
-			axs[1].set_title('Mono path', fontstyle='italic',fontsize='medium')
+			axs[1].set_title('channel filt', fontstyle='italic',fontsize='medium')
 
 			axs[2].plot(range(49,99), recoveredStereo[:50], c='blue')
 			axs[2].plot(x1, prevStereo[5071:], c='orange')
@@ -209,8 +209,9 @@ if __name__ == "__main__":
 
 			plt.show()
 
-		prevMono = mono_block
-		prevFilter = stereo_block
+		prevFilter = carrier_filt
+		prevMono = channel_filt
+
 		prevStereo = recoveredStereo
 
 		if block_count >= 10 and block_count < 12:
@@ -242,8 +243,8 @@ if __name__ == "__main__":
 	complete_data = np.vstack((left_data, right_data)).T
 
 	# write audio data to file
-	out_fname = "../data/fmStereoOldDemod.wav"
-	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*4095))
+	out_fname = "../data/fmStereoTest2.wav"
+	wavfile.write(out_fname, int(audio_Fs), np.int16((complete_data/2)*8191))
 	print("Written audio samples to \"" + out_fname + "\" in signed 16-bit format")
 
 	# uncomment assuming you wish to show some plots

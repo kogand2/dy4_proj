@@ -136,6 +136,7 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
     }
 
     std::vector<float> IQ_demod = sync_queue.front();
+
     sync_queue.pop();
     c_var.notify_one();
     lock.unlock();
@@ -274,6 +275,7 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
 
   // demodulation variables
 	std::vector<float> demod_state, IQ_demod;
+  std::vector<float> test_demod;
   float prev_phase = 0.0;
 	demod_state.resize(2, 0.0);
   int block_id = 0;
@@ -307,6 +309,19 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
 
     // perform demodulation on IQ data
     IQ_demod = fmDemodArctan(i_ds, q_ds, prev_phase);
+    test_demod = fmDemod(i_ds, q_ds, demod_state);
+
+    if (block_id == 1){
+      std::cerr << "starting IQ_demod: \n";
+      for (int i = 0; i<IQ_demod.size(); i++){
+        std::cerr << IQ_demod[i] << ", ";
+      }
+
+      std::cerr << "starting test_demod: \n";
+      for (int i = 0; i<test_demod.size(); i++){
+        std::cerr << test_demod[i] << ", ";
+      }
+    }
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();

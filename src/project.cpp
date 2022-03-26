@@ -167,6 +167,7 @@ void process_block_stream(int mode){
 		// perform demodulation on IQ data
 		IQ_demod = fmDemod(i_ds, q_ds, demod_state);
 
+
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     RF_run_time += stop_time-start_time;

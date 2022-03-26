@@ -48,6 +48,33 @@ std::vector<float> fmDemod(std::vector<float> I, std::vector<float> Q, std::vect
   return fm_demod;
 }
 
+std::vector<float> fmDemodArctan(std::vector<float> I, std::vector<float> Q, float &prev_phase)
+{
+  std::vector<float> fm_demod;
+  fm_demod.resize(I.size());
+  float current_phase;
+  for (int k = 0; k < I.size(); k++){
+    current_phase = std::atan2(Q[k], I[k]);
+
+    // unwrapping the angles here
+    if (abs(current_phase-prev_phase) > PI)
+    {
+      int i = 1;
+      while(abs(current_phase-prev_phase) > PI){
+        current_phase -= 2*i*PI;
+        i += 1;
+      }
+    }
+
+    fm_demod[k] = current_phase-prev_phase;
+
+    prev_phase = current_phase;
+
+  }
+  return fm_demod;
+
+}
+
 // LPF coefficient function
 void low_pass_coeff(float Fs, float Fc, int num_taps, std::vector<float> &h)
 {
@@ -157,36 +184,7 @@ void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt
   }
 }
 
-std::vector<float> fmDemodArctan(std::vector<float> I, std::vector<float> Q, float &prev_phase)
-{
-  std::vector<float> fm_demod;
-  fm_demod.resize(I.size());
-  float current_phase;
-  float phase_diff;
-  for (int k = 0; k < I.size(); k++){
-    current_phase = std::atan2(Q[k], I[k]);
 
-    phase_diff = current_phase - prev_phase;
-
-    if (fabs(phase_diff) != PI){
-      phase_diff = fmod(phase_diff + PI, 2*PI);
-
-
-      if (phase_diff < 0){
-        phase_diff += 2*PI;
-      }
-
-      phase_diff -= PI;
-    }
-
-    fm_demod[k] = prev_phase + phase_diff;
-
-    prev_phase = current_phase;
-
-  }
-  return fm_demod;
-
-}
 
 // convolution with no downsampling
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)

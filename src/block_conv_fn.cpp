@@ -157,6 +157,32 @@ void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt
   }
 }
 
+std::vector<float> fmDemodArctan(std::vector<float> &I, std::vector<float> &Q, std::vector<float> &fm_demod, float prev_phase = 0.0)
+{
+  fm_demod.resize(I.size());
+  float current_phase;
+  for (int k = 0; k < I.size(); k++){
+    current_phase = std::atan2(Q[k], I[k]);
+
+    // unwrapping the angles here
+    if (abs(current_phase-prev_phase) > PI)
+    {
+      int i = 1;
+      while(abs(current_phase-prev_phase) > PI){
+        current_phase -= 2*i*PI;
+        i += 1;
+      }
+    }
+
+    fm_demod[k] = current_phase-prev_phase;
+
+    prev_phase = current_phase;
+
+  }
+  return fm_demod;
+
+}
+
 // convolution with no downsampling
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)
 {

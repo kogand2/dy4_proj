@@ -136,11 +136,12 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
     }
 
     std::vector<float> IQ_demod = sync_queue.front();
+
     sync_queue.pop();
     c_var.notify_one();
     lock.unlock();
 
-    std::cerr << "Consume\n";
+    //std::cerr << "Consume\n";
     start_time = std::chrono::high_resolution_clock::now();
     //Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled
 		state_block_conv(carrier_filt, IQ_demod, carrier_coeff, carrier_state);
@@ -273,12 +274,12 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
   state_q_lpf_100k.resize(rf_coeff.size() - 1, 0.0);
 
   // demodulation variables
-	std::vector<float> demod_state, IQ_demod;
-	demod_state.resize(2, 0.0);
+	std::vector<float> IQ_demod;
+  float prev_phase = 0.0;
   int block_id = 0;
   // decipher each block
 	while(1) {
-    std::cerr << "Produce\n";
+    //std::cerr << "Produce\n";
 		std::vector<float> block_data(block_size);
     readStdinBlockData(block_size, block_data);
     if ((std::cin.rdstate()) != 0) {
@@ -305,7 +306,7 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
 
     // perform demodulation on IQ data
-    IQ_demod = fmDemod(i_ds, q_ds, demod_state);
+    IQ_demod = fmDemodArctan(i_ds, q_ds, prev_phase);
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();

@@ -27,6 +27,13 @@ audio_Fs = 48e3
 audio_decim = 5
 audio_taps = 151
 audio_Fc = 3e3
+
+#GCD = 124
+#Symbol rate: 2375 * 17
+demod_decim = 1920
+demod_exp = 323
+
+sps = 17
 # add other settings for audio, like filter taps, ...
 
 # flag that keeps track if your code is running for
@@ -69,10 +76,11 @@ if __name__ == "__main__":
 	state_phase = 0
 
 	dummy_state = np.array([0,0])						#For RF Demondulation
-	filt_block = np.zeros(shape=len(audio_coeff))		#For audio Processing
+
 	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Carrier Recovery
 	channel_block = np.zeros(shape=len(channel_coeff))	#For Channel Extraction
-	delay_block = np.zeros(shape=(audio_taps-1)//2)		#For All pass filter
+	demod_block =np.zeros(shape=len(audio_coeff))	#For Channel Extraction\
+	delay_block = np.zeros(shape=((audio_taps-1)//2))		#For All pass filter
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	# add state as needed for the mono channel filter
@@ -116,12 +124,12 @@ if __name__ == "__main__":
 
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
 
-		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 1.0, 0.0, 0.003, pll_block)
+		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.005, pll_block)
 
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
 
         #RDS Demodulation
-
+		demod_filt, demod_block = rs_block_convolution(audio_coeff, mixedAudio, demod_block, demod_decim, demod_exp)
 
 
         #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
@@ -152,16 +160,15 @@ if __name__ == "__main__":
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
 			print(len(channel_Delay))
-			print(len(prev2[974:]))
 			x1 = range(50)
 			x2 = range(50)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(range(50,100), channel_Delay[:50], c='blue')
-			axs[0].plot(x1, prev1[(len(prev1)-50):], c='orange')
+			axs[0].plot(range(50,100), demod_filt[:50], c='blue')
+			axs[0].plot(x1, prev1[(len(prev1)):], c='orange')
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(50,100), carrier_Input[:50], c='blue')
+			axs[1].plot(range(50,100), carrier_filt[:50], c='blue')
 			axs[1].plot(x1, prev2[(len(prev2)-50):], c='orange')
 			axs[1].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
 
@@ -171,8 +178,8 @@ if __name__ == "__main__":
 
 			plt.show()
 
-		prev1 = channel_Delay
-		prev2 = carrier_Input
+		prev1 = demod_filt
+		prev2 = carrier_filt
 		prevPLL = recoveredRDS
 
 		if block_count >= 10 and block_count < 12:

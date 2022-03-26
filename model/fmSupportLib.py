@@ -163,6 +163,29 @@ def ds_block_convolution(h, x, state, decim):
 
 	return down, new_state
 
+def rs_block_convolution(h, x, state, decim, exp):
+	y = np.zeros(len(x))
+	resample =  np.array([])
+	#x_index = 0
+
+	for n in range(0, len(x), decim):		#dominant partition
+		y[n] = 0.0
+		phase = n % exp
+		x_index = int((n-phase)/exp)
+
+		for k in range(0,len(h),exp):
+			if x_index >= 0:
+				y[n] += x[x_index]*h[k]*exp
+			else:
+				y[n] += exp * h[k] * state[state.size() + x_index]
+
+			x_index -= 1
+
+		resample = np.append(resample, y[n])
+
+	new_state = x[len(x) - len(h) + 1:]
+
+	return resample, new_state
 #======================================= path specific =======================================
 
 def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.01, state = []):

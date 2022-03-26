@@ -3,7 +3,7 @@
 CC = g++
 CFLAGS = -c -Wall -O3
 # CFLAGS = -c
-LDFLAGS =
+LDFLAGS = -pthread
 INCLUDE = -I../include/
 SOURCES = fmStereoDesign.cpp iofunc.cpp filter.cpp  fourier.cpp  genfunc.cpp  logfunc.cpp block_conv_fn.cpp mono_path.cpp
 OBJECTS = $(SOURCES:.cpp=.o)

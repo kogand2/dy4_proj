@@ -129,7 +129,6 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
 
   while (!end_of_stream || !sync_queue.empty()){
     // STEP 2: Stereo path
-    start_time = std::chrono::high_resolution_clock::now();
     std::unique_lock<std::mutex> lock(mutex);
 
     while (sync_queue.empty()){
@@ -142,6 +141,7 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
     lock.unlock();
 
     std::cerr << "Consume\n";
+    start_time = std::chrono::high_resolution_clock::now();
     //Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled
 		state_block_conv(carrier_filt, IQ_demod, carrier_coeff, carrier_state);
 		fmPll(carrier_filt, recoveredStereo, pll_state, 19e3, rf_Fs/rf_decim, 2.0, 0.0, 0.01);
@@ -189,6 +189,7 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
 
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
   }
+  std::cerr << "STEREO PATH RUNTIME: " << STEREO_run_time.count() << " ms" << "\n";
 }
 
 void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
@@ -312,7 +313,7 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue, \
 
     std::unique_lock<std::mutex> lock(mutex);
 
-    while (sync_queue.size() >= 8){
+    while (sync_queue.size() >= 4){
       c_var.wait(lock);
     }
 

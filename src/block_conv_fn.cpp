@@ -178,7 +178,7 @@ std::vector<float> fmDemodArctan(std::vector<float> I, std::vector<float> Q, flo
 
       phase_diff -= PI;
     }
-    
+
     fm_demod[k] = prev_phase + phase_diff;
 
     prev_phase = current_phase;

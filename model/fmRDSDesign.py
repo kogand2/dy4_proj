@@ -138,7 +138,7 @@ if __name__ == "__main__":
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			print(samples)
+			print(sampling_intervals)
 			n = 100
 			x1 = range(n)
 			x2 = range(n,n+n)
@@ -146,7 +146,7 @@ if __name__ == "__main__":
 			fig2.suptitle('State saving checking')
 			axs[0].plot(range(len(demod_filt)), demod_filt, c='blue')
 			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
-			axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="o", c='orange')
+			axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="x", c='orange', markersize=15)
 			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 			axs[0].axhline(y = 0, color = 'r', linestyle = '-')

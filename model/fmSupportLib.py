@@ -367,27 +367,28 @@ def CDR(signalIn, interval):
 	for k in range(1, len(signalIn)-1):
 		if ((signalIn[k-1]>0 and signalIn[k+1]<0) or (signalIn[k-1]<0 and signalIn[k+1]>0)):
 			if (sampling_intervals):
-				if (signalIn[k-1] == sampling_intervals[-1]):
-					previous = sampling_intervals.pop(k-1)
-					midpoint = (signalIn[k] + previous)/2
+				if (k-1 == sampling_intervals[-1]):
+					previous = sampling_intervals.pop(-1)
+					midpoint = (k + previous)/2
 					sampling_intervals.append(midpoint)
+				else:
+					sampling_intervals.append(k)
 			else:
 				sampling_intervals.append(k)
 				#sampling_intervals = [17, 32, 45, 78, 100]
 
 	for i in range(len(sampling_intervals)-1):
-		print(sampling_intervals[i], " ")
 		interval_range = sampling_intervals[i:i+2]
-		print("int range", interval_range)
+		#print("int range", interval_range)
 		#interval_range = [17, 32]
 		if ((interval_range[1]-interval_range[0]) >= 34):
-			subInterval = len(interval_range)//3
+			subInterval = (interval_range[1] - interval_range[0])//3
 			samples.append(sampling_intervals[i]+subInterval)
 			#samples.append(sampling_intervals[i]+subInterval)
 			samples.append(sampling_intervals[i]+(2*subInterval))
 			#samples.append(sampling_intervals[i]+(2*subInterval))
 		else:
-			samples.append((sampling_intervals[i]+len(interval_range))//2)
+			samples.append(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)
 			#samples.append((sampling_intervals[i]+len(interval_range))//2)
 
 	return samples, sampling_intervals

@@ -125,6 +125,43 @@ def myAllPass(input_block, state_block):
 
 	return output_block, state_block
 
+def rrc(Fs, N_taps):
+
+	"""
+	Root raised cosine (RRC) filter
+
+	Fs  		sampling rate at the output of the resampler in the RDS path
+				sampling rate must be an integer multipler of 2375
+				this integer multiple is the number of samples per symbol
+
+	N_taps  	number of filter taps
+
+	"""
+
+	# duration for each symbol - should NOT be changed for RDS!
+	T_symbol = 1/2375.0
+
+	# roll-off factor (must be greater than 0 and smaller than 1)
+	# for RDS a value in the range of 0.9 is a good trade-off between
+	# the excess bandwidth and the size/duration of ripples in the time-domain
+	beta = 0.90
+
+	# the RRC inpulse response that will be computed in this function
+	impulseResponseRRC = np.empty(N_taps)
+
+	for k in range(N_taps):
+		t = float((k-N_taps/2))/Fs
+		# we ignore the 1/T_symbol scale factor
+		if t == 0.0: impulseResponseRRC[k] = 1.0 + beta*((4/math.pi)-1)
+		elif t == -T_symbol/(4*beta) or t == T_symbol/(4*beta):
+			impulseResponseRRC[k] = (beta/np.sqrt(2))*(((1+2/math.pi)* \
+					(math.sin(math.pi/(4*beta)))) + ((1-2/math.pi)*(math.cos(math.pi/(4*beta)))))
+		else: impulseResponseRRC[k] = (math.sin(math.pi*t*(1-beta)/T_symbol) +  \
+					4*beta*(t/T_symbol)*math.cos(math.pi*t*(1+beta)/T_symbol))/ \
+					(math.pi*t*(1-(4*beta*t/T_symbol)*(4*beta*t/T_symbol))/T_symbol)
+
+	# returns the RRC impulse response to be used by convolution
+	return impulseResponseRRC
 #======================================= Convolution and sampling =======================================
 
 def block_convolution(h, xb, state): #Edits made from Feb 10, partitioned design
@@ -164,16 +201,16 @@ def ds_block_convolution(h, x, state, decim):
 	return down, new_state
 
 def rs_block_convolution(h, x, state, decim, exp):
-	y = np.zeros(len(x))
+	y = np.zeros(len(x)*exp)
 	resample =  np.array([])
 	#x_index = 0
 
-	for n in range(0, len(x), decim):		#dominant partition
+	for n in range(0, len(x)*exp, decim):		#dominant partition
 		y[n] = 0.0
 		phase = n % exp
 		x_index = int((n-phase)/exp)
 
-		for k in range(0,len(h),exp):
+		for k in range(phase,len(h),exp):
 			if x_index >= 0:
 				y[n] += x[x_index]*h[k]*exp
 			else:
@@ -183,7 +220,7 @@ def rs_block_convolution(h, x, state, decim, exp):
 
 		resample = np.append(resample, y[n])
 
-	new_state = x[len(x) - len(h) + 1:]
+	new_state = x[(len(x) - len(h))//exp + 1:]
 
 	return resample, new_state
 #======================================= path specific =======================================

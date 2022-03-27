@@ -28,36 +28,25 @@ audio_decim = 5
 audio_taps = 151
 audio_Fc = 3e3
 
-#GCD = 124
-#Symbol rate: 2375 * 17
+# RDS VARIABLES=================================================================
+# GCD = 125, U = 2375*17/125, D = 240000*U/(2375*17)
+sps = 17
+rds_sr = sps * 2375
 demod_decim = 1920
 demod_exp = 323
 
-sps = 17
 # add other settings for audio, like filter taps, ...
-
-# flag that keeps track if your code is running for
-# in-lab (il_vs_th = 0) vs takehome (il_vs_th = 1)
 
 if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0.raw"
+	in_fname = "../data/samples0_2400.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
 	iq_data = (np.float32(raw_data) - 128.0)/128.0
 	print("Reformatted raw RF data to 32-bit float format (" + str(iq_data.size * iq_data.itemsize) + " bytes)")
-
-	# coefficients for the front-end low-pass filter
-	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
-
-	carrier_coeff = myBandPass(113.5e3, 114.5e3, rf_Fs/rf_decim, audio_taps) #For Stereo Carrier Recovery
-
-	channel_coeff = myBandPass(54e3, 60e3, rf_Fs/rf_decim, audio_taps) #For Stereo Channel Extraction
-
-	audio_coeff = myLowPass(audio_Fc, rf_Fs/rf_decim, audio_taps) #For mono path combination
 
 	# set up the subfigures for plotting
 	subfig_height = np.array([0.8, 2, 2, 1.6]) # relative heights of the subfigures
@@ -65,26 +54,39 @@ if __name__ == "__main__":
 	fig, (ax0, ax1, ax3, ax2) = plt.subplots(nrows=4, gridspec_kw={'height_ratios': subfig_height})
 	fig.subplots_adjust(hspace = .6)
 
+	# FILTER COEFFICIENTS
+	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
+	carrier_coeff = myBandPass(113.5e3, 114.5e3, rf_Fs/rf_decim, audio_taps) #For RDS Carrier Recovery
+	channel_coeff = myBandPass(54e3, 60e3, rf_Fs/rf_decim, audio_taps) #For RDS Channel Extraction
+	rds_demod_coeff = myLowPass(3e3, rf_Fs/rf_decim, audio_taps)	# For RDS demodulation
+	rrc_coeff = rrc(rds_sr, audio_taps) # for RDS demodulation
+
 	# select a block_size that is a multiple of KB
 	# and a multiple of decimation factors
 	block_size = 1024 * rf_decim * audio_decim * 2
 	block_count = 0
 
-	# states needed for continuity in block processing
+	# STATE SAVING IQ
 	state_i_lpf_100k = np.zeros(rf_taps-1)
 	state_q_lpf_100k = np.zeros(rf_taps-1)
 	state_phase = 0
 
 	dummy_state = np.array([0,0])						#For RF Demondulation
 
+	# FILTERED DATA
+	channel_filt = np.zeros(shape=block_size//2 - 1)
+	carrier_filt = np.zeros(shape=block_size//2 - 1)
+	channel_Delay = np.zeros(shape=block_size//2 - 1)
+	demod_filt = np.zeros(shape=block_size//2 - 1)
+
+	# STATE SAVING
 	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Carrier Recovery
 	channel_block = np.zeros(shape=len(channel_coeff))	#For Channel Extraction
-	demod_block =np.zeros(shape=len(audio_coeff))	#For Channel Extraction\
 	delay_block = np.zeros(shape=((audio_taps-1)//2))		#For All pass filter
+	rds_demod_block =np.zeros(shape=len(rds_demod_coeff))	#For Demodulation Resampler
+	rds_rrc_block = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
-	# add state as needed for the mono channel filter
-
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
 
@@ -114,65 +116,42 @@ if __name__ == "__main__":
 		#dummy_fm, dummy_state = myDemod(i_ds, q_ds, dummy_state)
 
 		#print(len(i_ds))
+
     #RF front end stops here==================================================
 
+		# GET RDS CHANNEL
 		channel_filt, channel_block = block_convolution(channel_coeff, dummy_fm, channel_block)
 
+		# LOWER PATH OF RDS CARRIER RECOVERY: MATCH DELAY OF BPF (USED IN MIXER)
 		channel_Delay, delay_block = myAllPass(channel_filt, delay_block)
 
+		# UPPER PATH OF RDS CARRIER RECOVERY:
 		carrier_Input = sq_nonlinearity(channel_filt)
-
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
-
 		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.005, pll_block)
 
+        # RDS DEMODULATION
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
+		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
+		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
 
-        #RDS Demodulation
-		demod_filt, demod_block = rs_block_convolution(audio_coeff, mixedAudio, demod_block, demod_decim, demod_exp)
-
-
-        #Stereo Processing: Mixer -> Digital filtering (Lowpass -> down sample) -> Stereo Combiner
-
-
-		#stereo_block,filt_block = ds_block_convolution(audio_coeff, mixedAudio, filt_block, audio_decim)
-
-		# extract the mono audio data
-
-
-
-		#Generate Plots of PLL
-		#if block_count >= 3 and block_count < 6:
-		#	x1 = range(50)
-		#	x2 = range(50)
-		#	fig2, axs = plt.subplots(2)
-		#	fig2.suptitle('PLL Checking')
-		#	axs[0].plot(x2, carrier_filt[:50], c='blue')
-		#	axs[0].plot(x2, prevCarrier[5070:], c='orange')
-		#	axs[0].set_title('Carrier Input', fontstyle='italic',fontsize='medium')
-		#	axs[1].plot(x1, recoveredStereo[:50], c='blue')
-		############################	axs[1].plot(x1, prevPLL[5071:], c='orange')
-		#	axs[1].set_title('Carrier Output', fontstyle='italic',fontsize='medium')
-		#	plt.show()
-		#prevPLL = recoveredStereo
-		#prevCarrier = carrier_filt
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			print(len(channel_Delay))
+			print(len(demod_filt))
 			x1 = range(50)
-			x2 = range(50)
+			x2 = range(50,100)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(range(50,100), demod_filt[:50], c='blue')
-			axs[0].plot(x1, prev1[(len(prev1)):], c='orange')
+			axs[0].plot(x2, demod_filt[:50], c='blue')
+			axs[0].plot(x1, prev1[(len(prev1)-50):], c='orange')
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 
-			axs[1].plot(range(50,100), carrier_filt[:50], c='blue')
+			axs[1].plot(x2, carrier_filt[:50], c='blue')
 			axs[1].plot(x1, prev2[(len(prev2)-50):], c='orange')
 			axs[1].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
 
-			axs[2].plot(range(49,99), recoveredRDS[:50], c='blue')
+			axs[2].plot(x2, recoveredRDS[:50], c='blue')
 			axs[2].plot(x1, prevPLL[5071:], c='orange')
 			axs[2].set_title('PLL', fontstyle='italic',fontsize='medium')
 
@@ -181,7 +160,6 @@ if __name__ == "__main__":
 		prev1 = demod_filt
 		prev2 = carrier_filt
 		prevPLL = recoveredRDS
-
 		if block_count >= 10 and block_count < 12:
 
 			# plot PSD of selected block after FM demodulation

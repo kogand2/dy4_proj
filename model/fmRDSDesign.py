@@ -134,7 +134,7 @@ if __name__ == "__main__":
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
 		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
 		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
-		samples = CDR(demod_filt, sps)
+		samples, sampling_intervals = CDR(demod_filt, sps)
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
@@ -146,6 +146,7 @@ if __name__ == "__main__":
 			fig2.suptitle('State saving checking')
 			axs[0].plot(range(len(demod_filt)), demod_filt, c='blue')
 			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
+			axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="o", c='orange')
 			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 			axs[0].axhline(y = 0, color = 'r', linestyle = '-')
@@ -161,6 +162,7 @@ if __name__ == "__main__":
 			axs[2].axhline(y = 0, color = 'r', linestyle = '-')
 
 			plt.show()
+			quit()
 
 		prev1 = demod_filt
 		prev2 = carrier_filt

@@ -322,6 +322,21 @@ def sq_nonlinearity(signalIn):
 
 	return output #remember output will have a squared half amplitude and a positve offset of the same mag
 
+def CDR(signalIn, interval):
+	samples = np.empty([])
+	max = 0
+	index = 0;
+	for i in range(len(signalIn)):
+		if i % interval == 0 and i != 0:
+			print(i)
+			samples = np.append(samples, index)
+			max = 0
+		else:
+			if max < abs(signalIn[i]):
+				max = abs(signalIn[i])
+				index = i
+	return samples
+
 #======================================= from lab 3 =======================================
 def DFT(x):
 

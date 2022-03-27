@@ -134,26 +134,31 @@ if __name__ == "__main__":
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
 		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
 		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
-
+		samples = CDR(demod_filt, sps)
 
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			print(len(demod_filt))
-			x1 = range(50)
-			x2 = range(50,100)
+			print(samples)
+			n = 100
+			x1 = range(n)
+			x2 = range(n,n+n)
 			fig2, axs = plt.subplots(3)
 			fig2.suptitle('State saving checking')
-			axs[0].plot(x2, demod_filt[:50], c='blue')
-			axs[0].plot(x1, prev1[(len(prev1)-50):], c='orange')
+			axs[0].plot(range(len(demod_filt)), demod_filt, c='blue')
+			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
+			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
+			axs[0].axhline(y = 0, color = 'r', linestyle = '-')
 
-			axs[1].plot(x2, carrier_filt[:50], c='blue')
-			axs[1].plot(x1, prev2[(len(prev2)-50):], c='orange')
+			axs[1].plot(x2, carrier_filt[:n], c='blue')
+			axs[1].plot(x1, prev2[(len(prev2)-n):], c='orange')
 			axs[1].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
+			axs[1].axhline(y = 0, color = 'r', linestyle = '-')
 
-			axs[2].plot(x2, recoveredRDS[:50], c='blue')
-			axs[2].plot(x1, prevPLL[5071:], c='orange')
+			axs[2].plot(x2, recoveredRDS[:n], c='blue')
+			axs[2].plot(x1, prevPLL[(len(prevPLL)) - n:], c='orange')
 			axs[2].set_title('PLL', fontstyle='italic',fontsize='medium')
+			axs[2].axhline(y = 0, color = 'r', linestyle = '-')
 
 			plt.show()
 

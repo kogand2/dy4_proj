@@ -1,6 +1,7 @@
 #include "block_conv_fn.h"
 #include "dy4.h"
 #include "iofunc.h"
+#include <math.h>
 
 // testing time complexity
 #include <chrono>
@@ -120,6 +121,28 @@ void all_pass_coeff(std::vector<float> &y,std::vector<float> &x, std::vector<flo
   all_pass_state = std::vector<float>(x.begin() + x.size() - all_pass_state.size(), x.end());
 }
 
+// RRC coefficient function
+void rrc_coeff(float Fs, int num_taps, std::vector<float> &h)
+{
+  h.clear();
+  h.resize(num_taps, 0.0);
+
+  float T_symbol = 1/2375.0;
+  float beta = 0.90;
+  float t;
+
+  for (int i = 0; i < num_taps; i++){
+    t = ((i - num_taps)/2)/Fs;
+
+    if (t == 0.0)
+      h[i] = 1.0 + beta*((4/PI) - 1);
+    else if (t == -T_symbol/(4*beta) || t == T_symbol/(4*beta))
+      h[k] = (beta/sqrt(2))*(((1 + 2/PI)*(sin(PI/(4*beta)))) + ((1 - 2/PI)*(cos(PI/(4*beta)))));
+    else
+      h[k] = sin(PI*t*(1 - beta)/T_symbol) + 4*beta*(t/T_symbol)*cos(PI*t*(1+beta)/T_symbol))/(PI*t*(1 - (4*beta*t/T_symbol)*(4*beta*t/T_symbol))/T_symbol);
+  }
+}
+
 // FM PLL function
 void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<float> &state, float freq, float Fs, float ncoScale = 2.0, float phaseAdjust = 0.0, float normBandwidth = 0.01)
 {
@@ -173,14 +196,18 @@ void fmPll(std::vector<float> &pllIn, std::vector<float> &ncoOut, std::vector<fl
 void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt, std::vector<float> &mixedAudio)
 {
   mixedAudio.clear();
-//  mixedAudio.resize(channel_filt.size());
 
   for (int i = 0; i < channel_filt.size(); i++){
     mixedAudio.push_back(2 * recoveredStereo[i] * channel_filt[i]);	//this would have both the +ve and -ve part of the cos combined, we need to keep the -ve part and filter it
   }
 }
 
-
+// square non-linearity function
+void sq_non_linearity(std::vector<float> &signalIn)
+{
+  for (int i = 0; i < signalIn.size(); i++)
+    signalIn[i] = SignalIn[i] * signalIn[i];
+}
 
 // convolution with no downsampling
 void state_block_conv(std::vector<float> &y, const std::vector<float> &x, const std::vector<float> &h, std::vector<float> &state)

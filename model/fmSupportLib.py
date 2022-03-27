@@ -393,6 +393,73 @@ def CDR(signalIn, interval):
 
 	return samples, sampling_intervals
 
+def diff_decoding(manchester_values):
+	bits = []
+	decoded_bits = []
+
+	for i in range(0, len(manchester_values) - 1, 2):
+		if manchester_values[i] == 0 and manchester_values[i+1] == 1:
+			bits.append(0)
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 0:
+			bits.append(1)
+
+	decoded_bits.append(bits[0])
+	print(bits)
+	for i in range(1, len(bits)):
+		decoded_bits.append(bits[i] ^ bits[i-1])
+	print(decoded_bits)
+	return decoded_bits
+
+
+def CDR_state(signalIn, interval, cdr_state):
+	#signalIn is at y=0 when x=17, 32, 45, 78, 100
+	sampling_intervals = []
+	samples = []
+	sample_vals = [cdr_state]
+
+
+	for k in range(1, len(signalIn)-1):
+		if ((signalIn[k-1]>0 and signalIn[k+1]<0) or (signalIn[k-1]<0 and signalIn[k+1]>0)):
+			if (sampling_intervals):
+				if (k-1 == sampling_intervals[-1]):
+					previous = sampling_intervals.pop(-1)
+					midpoint = (k + previous)/2
+					sampling_intervals.append(midpoint)
+				else:
+					sampling_intervals.append(k)
+			else:
+				sampling_intervals.append(k)
+				#sampling_intervals = [17, 32, 45, 78, 100]
+
+	for i in range(len(sampling_intervals)-1):
+		interval_range = sampling_intervals[i:i+2]
+		#print("int range", interval_range)
+		#interval_range = [17, 32]
+		if ((interval_range[1]-interval_range[0]) >= 34):
+			subInterval = (interval_range[1] - interval_range[0])//3
+			if signalIn[math.ceil(sampling_intervals[i]+subInterval)] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+subInterval)
+			#samples.append(sampling_intervals[i]+subInterval)
+			if signalIn[math.ceil(sampling_intervals[i]+(2*subInterval))] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+(2*subInterval))
+			#samples.append(sampling_intervals[i]+(2*subInterval))
+		else:
+			if signalIn[math.ceil(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)
+			#samples.append((sampling_intervals[i]+len(interval_range))//2)
+
+	cdr_state = 1 - sample_vals[-1]
+	return samples, sampling_intervals, sample_vals, cdr_state
+
 
 #======================================= from lab 3 =======================================
 def DFT(x):

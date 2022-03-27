@@ -89,6 +89,7 @@ if __name__ == "__main__":
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
+	cdr_state = 0
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
@@ -134,11 +135,28 @@ if __name__ == "__main__":
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
 		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
 		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
-		samples, sampling_intervals = CDR(demod_filt, sps)
-
+		samples, sampling_intervals, sample_vals, cdr_state = CDR_state(demod_filt, sps, cdr_state)
+		bits = diff_decoding(sample_vals)
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			print(sampling_intervals)
+			i_samples = np.zeros(shape=len(demod_filt))
+			q_samples = np.zeros(shape=len(demod_filt))
+
+			for i in range(len(demod_filt)):
+				i_samples[i] = math.cos(demod_filt[i])
+				q_samples[i] = math.sin(demod_filt[i])
+
+			print(i_samples)
+			print(q_samples)
+			fig, ax = plt.subplots(2)
+			fig.suptitle('constellation graphs')
+
+			#ax.set_xlabel("in_phase")
+			#ax.set_ylabel("quadrature")
+
+			ax[0].plot(range(len(i_samples)), i_samples)
+			ax[1].plot(range(len(q_samples)), q_samples)
+
 			n = 100
 			x1 = range(n)
 			x2 = range(n,n+n)
@@ -148,6 +166,7 @@ if __name__ == "__main__":
 			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
 			axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="x", c='orange', markersize=15)
 			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
+			print(sample_vals)
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 			axs[0].axhline(y = 0, color = 'r', linestyle = '-')
 
@@ -162,7 +181,6 @@ if __name__ == "__main__":
 			axs[2].axhline(y = 0, color = 'r', linestyle = '-')
 
 			plt.show()
-			quit()
 
 		prev1 = demod_filt
 		prev2 = carrier_filt

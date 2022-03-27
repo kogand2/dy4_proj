@@ -322,6 +322,7 @@ def sq_nonlinearity(signalIn):
 
 	return output #remember output will have a squared half amplitude and a positve offset of the same mag
 
+'''
 def CDR(signalIn, interval):
 	samples = np.empty([])
 	max = 0
@@ -336,6 +337,46 @@ def CDR(signalIn, interval):
 				max = abs(signalIn[i])
 				index = i
 	return samples
+'''
+
+'''
+def CDR(signalIn, interval):
+	samples = np.empty([])
+	interval_ctr = 0
+	for i in range(len(signalIn):
+		interval_range = range(i, i+interval_ctr)
+		if ((signalIn[i-1]>=0 && signalIn[i]<=0) || (signalIn[i-1]>=0 && signalIn[i]<=0)):
+			interval_ctr = 0
+
+		if (interval_ctr>=34):
+			sampling_interval = interval_ctr//3
+			samples.append(i+sampling_interval)
+			samples.append(i+(2*sampling_interval))
+		else:
+			samples.append((i+interval_ctr)//2)
+
+		interval_ctr+=1
+'''
+
+def CDR(signalIn, interval):
+	sampling_intervals = np.empty([])
+	samples = np.empty([])
+
+	for k in range(len(signalIn)):
+		if ((signalIn[k-1]>=0 && signalIn[k+1]<=0) || (signalIn[k-1]>=0 && signalIn[k+1]<=0)):
+			sampling_intervals.append(k)
+
+	for i in range(len(sampling_intervals)-1)
+		interval_range = range(sampling_intervals[i], sampling_intervals[i]+1)
+		if (len(interval_range) >= 34):
+			subInterval = len(interval_range)//3
+			samples.append(sampling_intervals[i]+subInterval)
+			samples.append(sampling_intervals[i]+(2*subInterval))
+		else:
+			samples.append((sampling_intervals[i]+len(interval_range))//2)
+
+	return samples
+
 
 #======================================= from lab 3 =======================================
 def DFT(x):

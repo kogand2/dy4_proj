@@ -214,13 +214,13 @@ def rs_block_convolution(h, x, state, decim, exp):
 			if x_index >= 0:
 				y[n] += x[x_index]*h[k]*exp
 			else:
-				y[n] += exp * h[k] * state[state.size() + x_index]
+				y[n] += exp * h[k] * state[len(state) + x_index]
 
 			x_index -= 1
 
 		resample = np.append(resample, y[n])
 
-	new_state = x[(len(x) - len(h))//exp + 1:]
+	new_state = x[len(x) - len(h)//exp + 1:]
 
 	return resample, new_state
 #======================================= path specific =======================================

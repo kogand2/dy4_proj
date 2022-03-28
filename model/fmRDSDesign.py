@@ -58,7 +58,7 @@ if __name__ == "__main__":
 	rf_coeff = signal.firwin(rf_taps, rf_Fc/(rf_Fs/2), window=('hann'))
 	carrier_coeff = myBandPass(113.5e3, 114.5e3, rf_Fs/rf_decim, audio_taps) #For RDS Carrier Recovery
 	channel_coeff = myBandPass(54e3, 60e3, rf_Fs/rf_decim, audio_taps) #For RDS Channel Extraction
-	rds_demod_coeff = myLowPass(3e3, rf_Fs/rf_decim, audio_taps)	# For RDS demodulation
+	rds_demod_coeff = myLowPass(3e3, (rf_Fs/rf_decim)*demod_exp, audio_taps*demod_exp)	# For RDS demodulation
 	rrc_coeff = rrc(rds_sr, audio_taps) # for RDS demodulation
 
 	# select a block_size that is a multiple of KB
@@ -130,12 +130,12 @@ if __name__ == "__main__":
 		# UPPER PATH OF RDS CARRIER RECOVERY:
 		carrier_Input = sq_nonlinearity(channel_filt)
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
-		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.001, pll_block)
+		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.005, pll_block)
 
         # RDS DEMODULATION
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
-		#demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
-		demod_filt = signal.resample_poly(mixedAudio, demod_exp, demod_decim)
+		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
+		#demod_filt = signal.resample_poly(mixedAudio, demod_exp, demod_decim)
 		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
 		samples, manchester_values, cdr_state, initial = CDR_state(demod_filt, sps, cdr_state, initial)
 
@@ -148,7 +148,7 @@ if __name__ == "__main__":
 			print(len(samples))
 			print(manchester_values)
 			i_samples = []
-			q_samples =[]
+			q_samples = []
 
 			for i in range(0, len(demod_filt), 2):
 				i_samples.append(math.sin(demod_filt[i]))

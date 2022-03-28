@@ -132,14 +132,14 @@ void rrc_coeff(float Fs, int num_taps, std::vector<float> &h)
   float t;
 
   for (int i = 0; i < num_taps; i++){
-    t = ((i - num_taps)/2)/Fs;
-
-    if (t == 0.0)
+    t = (i - num_taps/2.0)/Fs;
+    if (t == 0.0){
       h[i] = 1.0 + beta*((4/PI) - 1);
-    else if (t == -T_symbol/(4*beta) || t == T_symbol/(4*beta))
-      h[k] = (beta/sqrt(2))*(((1 + 2/PI)*(sin(PI/(4*beta)))) + ((1 - 2/PI)*(cos(PI/(4*beta)))));
-    else
-      h[k] = sin(PI*t*(1 - beta)/T_symbol) + 4*beta*(t/T_symbol)*cos(PI*t*(1+beta)/T_symbol))/(PI*t*(1 - (4*beta*t/T_symbol)*(4*beta*t/T_symbol))/T_symbol);
+    }else if (t == -T_symbol/(4*beta) || t == T_symbol/(4*beta)){
+      h[i] = (beta/sqrt(2))*(((1 + 2/PI)*(sin(PI/(4*beta)))) + ((1 - 2/PI)*(cos(PI/(4*beta)))));
+    }else{
+      h[i] = (sin(PI*t*(1 - beta)/T_symbol) + 4*beta*(t/T_symbol)*cos(PI*t*(1+beta)/T_symbol))/(PI*t*(1 - (4*beta*t/T_symbol)*(4*beta*t/T_symbol))/T_symbol);
+    }
   }
 }
 
@@ -203,10 +203,13 @@ void mixer(std::vector<float> &recoveredStereo, std::vector<float> &channel_filt
 }
 
 // square non-linearity function
-void sq_non_linearity(std::vector<float> &signalIn)
+std::vector<float> sq_non_linearity(std::vector<float> signalIn)
 {
+  std::vector<float> carrier_input;
   for (int i = 0; i < signalIn.size(); i++)
-    signalIn[i] = SignalIn[i] * signalIn[i];
+    carrier_input.push_back(signalIn[i] * signalIn[i]);
+
+  return carrier_input;
 }
 
 // convolution with no downsampling
@@ -294,18 +297,15 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
     phase = n % audio_exp;
 
     x_index = (n - phase) / audio_exp;
-
     y[n] = 0;
 
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
-
         //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << x_index << "]\n";
 				y[n] += audio_exp * h[k] * x[x_index];
 
       }
       else{
-
 				y[n] += audio_exp * h[k] * state[state.size() + x_index];
         //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  x_index << "]\n";
       }
@@ -316,7 +316,6 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
   }
 
-
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> DFT_run_time = stop_time-start_time;
   //std::cerr << "FOR LOOP RUNTIME: " << DFT_run_time.count() << " ms" << "\n";
@@ -326,7 +325,6 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
   //std::cerr << "rs: " << count << "\n";
   int index = x.size() - h.size()/audio_exp + 1;
 	state = std::vector<float>(x.begin() + index, x.end());
-
   stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
   //std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";

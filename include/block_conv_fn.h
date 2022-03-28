@@ -25,13 +25,13 @@ void band_pass_coeff(float, float, float, int, std::vector<float> &);
 
 void all_pass_coeff(std::vector<float> &,std::vector<float> &, std::vector<float> &);
 
-void rrc_coeff(float, int, std::vector<float> &)
+void rrc_coeff(float, int, std::vector<float> &);
 
 void fmPll(std::vector<float> &, std::vector<float> &, std::vector<float> &, float, float, float, float, float);
 
 void mixer(std::vector<float> &, std::vector<float> &, std::vector<float> &);
 
-void sq_non_linearity(std::vector<float> &)
+std::vector<float> sq_non_linearity(std::vector<float>);
 
 void state_block_conv(std::vector<float> &, const std::vector<float> &, const std::vector<float> &, std::vector<float> &);
 

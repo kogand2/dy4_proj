@@ -62,19 +62,18 @@ std::vector<float> rds_path_main(int mode){
 
   // RF front end variables
 	float rf_Fc = 100000.0;
-	int rf_taps = 101;
-
+	int rf_taps = 151;
+  int audio_taps = 151;
   // RDS path variables
   int rds_sr = sps * 2375;
 
   // filter coefficients for RDS
   std::vector<float> rf_coeff, carrier_coeff, channel_coeff, rds_demod_coeff, rds_rrc_coeff;
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
-	band_pass_coeff(113500, 114500, rf_Fs/rf_decim, rf_taps, carrier_coeff);
-	band_pass_coeff(54000, 60000, rf_Fs/rf_decim, rf_taps, channel_coeff);
-	low_pass_coeff(3000, rf_Fc, rf_taps, rds_demod_coeff);
-  rrc_coeff(rds_sr, rf_taps, rds_rrc_coeff)
-
+	band_pass_coeff(113500, 114500, rf_Fs/rf_decim, audio_taps, carrier_coeff);
+	band_pass_coeff(54000, 60000, rf_Fs/rf_decim, audio_taps, channel_coeff);
+	low_pass_coeff((rf_Fs/rf_decim)*demod_exp, 3000, audio_taps*demod_exp, rds_demod_coeff);
+  rrc_coeff(rds_sr, rf_taps, rds_rrc_coeff);
 	int block_size = 102400;
 
   // regular IQ data
@@ -102,10 +101,14 @@ std::vector<float> rds_path_main(int mode){
 	demod_state.resize(2, 0.0);
 
   // RDS filtered data
-  std::vector<float> carrier_filt, channel_filt, recoveredRDS, rds_demod_filt, demod_down;
+  std::vector<float> carrier_filt, channel_filt, recoveredRDS, rds_demod_filt, rrc_demod_filt, demod_down, rds_demod_block;
   carrier_filt.resize(i_data.size() - 1);
   channel_filt.resize(i_data.size() - 1);
-  rds_demod_filt.resize(i_data.size() - 1);
+  rds_demod_filt.resize(demod_exp*(i_data.size() - 1));
+  rds_demod_block.resize(rds_demod_filt.size()/demod_decim);
+
+  rrc_demod_filt.resize(rds_demod_block.size());
+
 
   // state saving variables for RDS path
 	std::vector<float> carrier_state, channel_state, rds_demod_state, rds_rrc_state, pll_state;
@@ -123,10 +126,11 @@ std::vector<float> rds_path_main(int mode){
   pll_state[5] = 0.0;
 
   // RDS demodulation
-  std::vector<float> mixed_audio, delay_block, channel_delay, rds_demod_block;
+  std::vector<float> mixed_audio, delay_block, channel_delay;
   mixed_audio.resize(i_data.size() - 1);
   delay_block.resize((rf_taps - 1)/2);
-  rds_demod_block.resize((rds_demod_filt)/demod_decim);
+
+  float prev_phase = 0.0;
 
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
@@ -161,7 +165,8 @@ std::vector<float> rds_path_main(int mode){
 		ds_block_conv(q_filt,q_data,rf_coeff,state_q_lpf_100k,rf_decim,q_ds);
 
     // perform demodulation on IQ data
-    IQ_demod = fmDemod(i_ds, q_ds, demod_state);
+    IQ_demod = fmDemodArctan(i_ds, q_ds, prev_phase);
+
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
@@ -172,22 +177,30 @@ std::vector<float> rds_path_main(int mode){
 
     //RDS Channel Extraction: all-pass
 		state_block_conv(channel_filt, IQ_demod, channel_coeff, channel_state);
-
-		//RDS Carrier Recovery: non-linearity -> Bandpass -> PLL -> Numerically Controlled
-    sq_non_linearity(channel_filt);
-		state_block_conv(carrier_filt, channel_filt, carrier_coeff, carrier_state);
-		fmPll(carrier_filt, recoveredRDS, pll_state, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.005);
     all_pass_coeff(channel_delay, channel_filt, delay_block);
 
+		//RDS Carrier Recovery: non-linearity -> Bandpass -> PLL -> Numerically Controlled
+    std::vector<float> carrier_input = sq_non_linearity(channel_filt);
+
+		state_block_conv(carrier_filt, carrier_input, carrier_coeff, carrier_state);
+
+		fmPll(carrier_filt, recoveredRDS, pll_state, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.001);
+
     //RDS Demodulation: mixer -> digital filtering (lowpass -> resampler) -> rrc -> CDR
-		mixer(recoveredRDS, channel_delay, mixed_audio);
-    rs_block_conv(rds_demod_filt, mixedAudio, rds_demod_coeff, rds_rrc_state, demod_decim, demod_exp, rds_demod_block);
-    state_block_conv(rds_demod_block, rds_demod_block, rds_rrc_coeff, rds_rrc_state);
+		mixer(recoveredRDS, channel_filt, mixed_audio);
+
+    rds_demod_block.clear();
+    rs_block_conv(rds_demod_filt, mixed_audio, rds_demod_coeff, rds_demod_state, demod_decim, demod_exp, rds_demod_block);
+
+    state_block_conv(rrc_demod_filt, rds_demod_block, rds_rrc_coeff, rds_rrc_state);
+    printRealVector(rrc_demod_filt);
+    break;
     //...
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     RDS_run_time += stop_time-start_time;
+  }
 }
 
 int main(int argc, char* argv[])

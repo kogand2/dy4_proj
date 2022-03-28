@@ -358,6 +358,7 @@ def CDR(signalIn, interval):
 		interval_ctr+=1
 '''
 
+'''
 def CDR(signalIn, interval):
 	#signalIn is at y=0 when x=17, 32, 45, 78, 100
 	sampling_intervals = []
@@ -392,7 +393,8 @@ def CDR(signalIn, interval):
 			#samples.append((sampling_intervals[i]+len(interval_range))//2)
 
 	return samples, sampling_intervals
-
+'''
+'''
 def diff_decoding(manchester_values):
 	bits = []
 	decoded_bits = []
@@ -409,8 +411,78 @@ def diff_decoding(manchester_values):
 		decoded_bits.append(bits[i] ^ bits[i-1])
 	print(decoded_bits)
 	return decoded_bits
+'''
+
+def diff_decoding(manchester_values):
+	bits = []
+	decoded_bits = []
+	#print(manchester_values)
+	for i in range(0, len(manchester_values) - 1, 2):
+		if manchester_values[i] == 0 and manchester_values[i+1] == 1:	# LH = 0
+			bits.append(0)
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 0: # HL = 1
+			bits.append(1)
+		# change the two H's into one H
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+			i -= 1
+
+		# change the two L's into one L
+		elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+			i -= 1
 
 
+	#print(bits)
+	decoded_bits.append(bits[0])
+	#print(bits)
+	for i in range(1, len(bits)):
+		decoded_bits.append(bits[i] ^ bits[i-1])
+
+	print("THIS IS DECODED")
+	print(decoded_bits)
+	print(len(decoded_bits))
+	print("THIS IS MANCHESTER")
+	print(manchester_values)
+	print(len(manchester_values))
+	return decoded_bits
+
+def CDR_state(signalIn, interval, cdr_state, initial):
+
+	samples = []				# x vals (just for testing)
+	sample_vals = [cdr_state]	# y vals (manchester_values)
+	best_init = initial			# index sampling starts from
+
+	# processing first block, find best initial point to start sampling
+	if (initial == -1):
+		max = 0.0
+		curr = 0.0
+		best_init = 0
+		# testing from 0 to 17 or xx?
+		for initial in range(0, interval):
+			# reset for next vals
+			curr = 0.0
+			for i in range(initial, len(signalIn), interval):
+				curr += abs(signalIn[i])
+
+			#print("FOR INIITAL POINT = " + str(initial) + " : " + str(curr))
+			if (max < curr):
+				max = curr
+				best_init = initial
+
+	# processing rest of blocks
+	else:
+		for i in range(initial, len(signalIn), interval):
+			samples.append(i)
+			if (signalIn[i] > 0):	# get a HI
+				sample_vals.append(1)
+			else:					# get a LO
+				sample_vals.append(0)
+
+		cdr_state = 1 - sample_vals[-1]
+
+	return samples, sample_vals, cdr_state, best_init
+
+
+'''
 def CDR_state(signalIn, interval, cdr_state):
 	#signalIn is at y=0 when x=17, 32, 45, 78, 100
 	sampling_intervals = []
@@ -459,7 +531,7 @@ def CDR_state(signalIn, interval, cdr_state):
 
 	cdr_state = 1 - sample_vals[-1]
 	return samples, sampling_intervals, sample_vals, cdr_state
-
+'''
 
 #======================================= from lab 3 =======================================
 def DFT(x):

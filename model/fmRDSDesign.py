@@ -90,6 +90,7 @@ if __name__ == "__main__":
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
 	cdr_state = 0
+	initial = -1
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
@@ -129,33 +130,37 @@ if __name__ == "__main__":
 		# UPPER PATH OF RDS CARRIER RECOVERY:
 		carrier_Input = sq_nonlinearity(channel_filt)
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
-		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.005, pll_block)
+		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.001, pll_block)
 
         # RDS DEMODULATION
 		mixedAudio = mixer(recoveredRDS, channel_Delay)
-		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
+		#demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
+		demod_filt = signal.resample_poly(mixedAudio, demod_exp, demod_decim)
 		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
-		samples, sampling_intervals, sample_vals, cdr_state = CDR_state(demod_filt, sps, cdr_state)
-		bits = diff_decoding(sample_vals)
+		samples, manchester_values, cdr_state, initial = CDR_state(demod_filt, sps, cdr_state, initial)
+
+		# DO REST OF RDS AFTER BLOCK 1 (SINCE BLOCK 1 JUST FOR SET UP)
+		if block_count > 0:
+			bits = diff_decoding(manchester_values)
+
 		#Generate Plots of Monopath
 		if block_count >= 3 and block_count < 6:
-			i_samples = np.zeros(shape=len(demod_filt))
-			q_samples = np.zeros(shape=len(demod_filt))
+			print(len(samples))
+			print(manchester_values)
+			i_samples = []
+			q_samples =[]
 
-			for i in range(len(demod_filt)):
-				i_samples[i] = math.cos(demod_filt[i])
-				q_samples[i] = math.sin(demod_filt[i])
+			for i in range(0, len(demod_filt), 2):
+				i_samples.append(math.sin(demod_filt[i]))
+				q_samples.append(math.cos(demod_filt[i+1]))
 
-			print(i_samples)
-			print(q_samples)
-			fig, ax = plt.subplots(2)
+			fig, ax = plt.subplots(1)
 			fig.suptitle('constellation graphs')
 
-			#ax.set_xlabel("in_phase")
-			#ax.set_ylabel("quadrature")
+			ax.set_xlabel("in_phase")
+			ax.set_ylabel("quadrature")
 
-			ax[0].plot(range(len(i_samples)), i_samples)
-			ax[1].plot(range(len(q_samples)), q_samples)
+			ax.scatter(i_samples, q_samples, s=10)
 
 			n = 100
 			x1 = range(n)
@@ -164,9 +169,9 @@ if __name__ == "__main__":
 			fig2.suptitle('State saving checking')
 			axs[0].plot(range(len(demod_filt)), demod_filt, c='blue')
 			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
-			axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="x", c='orange', markersize=15)
+			#axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="x", c='orange', markersize=15)
 			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
-			print(sample_vals)
+			#print(manchester_values)
 			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 			axs[0].axhline(y = 0, color = 'r', linestyle = '-')
 

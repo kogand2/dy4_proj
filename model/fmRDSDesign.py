@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples3.raw"
+	in_fname = "../data/samples0_2400.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -63,7 +63,7 @@ if __name__ == "__main__":
 
 	# select a block_size that is a multiple of KB
 	# and a multiple of decimation factors
-	block_size = 1024 * rf_decim * audio_decim * 2
+	block_size = 38400*2
 	block_count = 0
 
 	# STATE SAVING IQ
@@ -92,10 +92,10 @@ if __name__ == "__main__":
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
 
-	cdr_stateI = [0, 0]
+	cdr_stateI = [0, 0, 0]
 	initialI = -1
 
-	cdr_stateQ = [0, 0]
+	cdr_stateQ = [0, 0, 0]
 	initialQ = -1
 
 	decode_init = -1
@@ -152,14 +152,15 @@ if __name__ == "__main__":
 
 		# DO REST OF RDS AFTER BLOCK 1 (SINCE BLOCK 1 JUST FOR SET UP)
 		if block_count >= 1:
-			samplesQ, manchester_values, cdr_stateQ, initialQ = CDR_state(demod_filtQ, sps, cdr_stateQ, initialQ)
-			samplesI, manchester_values, cdr_stateI, initialI = CDR_state(demod_filtI, sps, cdr_stateI, initialI)
-			bits, decode_init = diff_decoding(manchester_values, decode_init)
-			print("sample value: ", samplesI)
+			samplesQ, manchester_values, initialQ = CDR_state(demod_filtQ, sps, initialQ)
+			samplesI, manchester_values, initialI = CDR_state(demod_filtI, sps, initialI)
+			bits, decode_init = diff_decoding(manchester_values, decode_init, cdr_stateI)
+			cdr_stateI = [manchester_values[-1], samplesI[-1], bits[-1]]
+
 			#print("Last value: " + str(samplesI[-1]))
 		#Generate Plots of Monopath
 		if block_count >= 6 and block_count < 9:
-			'''
+
 			# IQ CONSTELLATION PLOTS
 			in_phase = []
 			quad = []
@@ -179,7 +180,7 @@ if __name__ == "__main__":
 			ax.scatter(in_phase, quad, s=10)
 			ax.set_xlim([-1,1])
 			ax.set_ylim([-1,1])
-			'''
+
 			n = 100
 			x1 = range(n)
 			x2 = range(n,n+n)
@@ -211,6 +212,7 @@ if __name__ == "__main__":
 		prevPLLI = recoveredRDSI
 		prevPLLQ = recoveredRDSQ
 		print("===================================================================")
+		"""
 		if block_count >= 10 and block_count < 12:
 
 			# plot PSD of selected block after FM demodulation
@@ -232,7 +234,7 @@ if __name__ == "__main__":
 			fmPlotPSD(ax3, left_data, audio_Fs/1e3, subfig_height[3], 'Left Channel')
 			# save figure to file
 			fig.savefig("../data/fmMonoBlockDelay" + str(block_count) + ".png")
-
+		"""
 		block_count += 1
 
 	print('Finished processing all the blocks from the recorded I/Q samples')

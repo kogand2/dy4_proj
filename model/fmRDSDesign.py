@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0_2400.raw"
+	in_fname = "../data/samples3.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -154,11 +154,12 @@ if __name__ == "__main__":
 		if block_count >= 1:
 			samplesQ, manchester_values, cdr_stateQ, initialQ = CDR_state(demod_filtQ, sps, cdr_stateQ, initialQ)
 			samplesI, manchester_values, cdr_stateI, initialI = CDR_state(demod_filtI, sps, cdr_stateI, initialI)
-			bits, decode_init = diff_decoding(manchester_values, decode_init, cdr_stateI)
-
+			bits, decode_init = diff_decoding(manchester_values, decode_init)
+			print("sample value: ", samplesI)
+			#print("Last value: " + str(samplesI[-1]))
 		#Generate Plots of Monopath
-		if block_count >= 4 and block_count < 6:
-
+		if block_count >= 6 and block_count < 9:
+			'''
 			# IQ CONSTELLATION PLOTS
 			in_phase = []
 			quad = []
@@ -178,7 +179,7 @@ if __name__ == "__main__":
 			ax.scatter(in_phase, quad, s=10)
 			ax.set_xlim([-1,1])
 			ax.set_ylim([-1,1])
-
+			'''
 			n = 100
 			x1 = range(n)
 			x2 = range(n,n+n)
@@ -209,7 +210,7 @@ if __name__ == "__main__":
 		prev2 = carrier_filt
 		prevPLLI = recoveredRDSI
 		prevPLLQ = recoveredRDSQ
-
+		print("===================================================================")
 		if block_count >= 10 and block_count < 12:
 
 			# plot PSD of selected block after FM demodulation

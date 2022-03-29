@@ -326,6 +326,103 @@ def sq_nonlinearity(signalIn):
 	return output #remember output will have a squared half amplitude and a positve offset of the same mag
 
 
+def diff_decoding(manchester_values, initial):
+	bits = []
+	decoded_bits = []
+
+	if (initial == -1):
+		ind1 = 0
+		ind2 = 0
+
+		for i in range(0, len(manchester_values) - 1, 2):
+			if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+				ind1 += 1
+			elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+				ind1 += 1
+
+		for i in range(1, len(manchester_values) - 1, 2):
+			if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+				ind2 += 1
+			elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+				ind2 += 1
+
+		if (ind1 > ind2):
+			initial = 1
+		else:
+			initial = 0
+
+	print("CHOSE : " +str(initial))
+	#print(manchester_values)
+	for i in range(initial, len(manchester_values) - 1, 2):
+		if manchester_values[i] == 0 and manchester_values[i+1] == 1:	# LH = 0
+			bits.append(0)
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 0: # HL = 1
+			bits.append(1)
+		# change the two H's into one H
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+			#i -= 1
+			print("Consecutive HI")
+		# change the two L's into one L
+		elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+			#i -= 1
+			print("Consecutive LO")
+
+	decoded_bits.append(bits[0])
+	for i in range(1, len(bits)):
+		decoded_bits.append(bits[i] ^ bits[i-1])
+
+	print("THIS IS MANCHESTER")
+	print(manchester_values)
+	print("MANCHESTER Length: " + str(len(manchester_values)))
+
+	print("THIS IS DECODED")
+	print(decoded_bits)
+	print("DECODED Length: " + str(len(decoded_bits)))
+	#print("===================================================================")
+	return decoded_bits, initial
+
+def CDR_state(signalIn, interval, cdr_state, initial):
+
+	samples = []				# x vals (just for testing)
+	sample_vals = []	# y vals (manchester_values)
+	best_init = initial			# index sampling starts from
+
+	# processing first block, find best initial point to start sampling
+	if (initial == -1):
+		max = 0.0
+		curr = 0.0
+		best_init = 0
+		# testing from 0 to 17 or xx?
+		for initial in range(0, interval):
+			# reset for next vals
+			curr = 0.0
+			for i in range(initial, len(signalIn), interval):
+				curr += abs(signalIn[i])
+
+			print("FOR INIITAL POINT = " + str(initial) + " : " + str(curr))
+			if (max < curr):
+				max = curr
+				best_init = initial
+
+		print("THIS IS THE MAX " + str(max))
+
+	else:
+		best_init = interval - (len(signalIn) - cdr_state[1])
+
+	print("CHOSE initial " + str(best_init))
+	# processing rest of blocks
+	for i in range(best_init, len(signalIn), interval):
+		samples.append(i)
+		if (signalIn[i] > 0):	# get a HI
+			sample_vals.append(1)
+		else:					# get a LO
+			sample_vals.append(0)
+
+	cdr_state = [sample_vals[-1], samples[-1]]
+	#print("===================================================================")
+
+	return samples, sample_vals, cdr_state, best_init
+
 
 '''
 def diff_decoding(manchester_values, initial, cdr_state):

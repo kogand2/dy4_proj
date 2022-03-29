@@ -92,13 +92,13 @@ if __name__ == "__main__":
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
 
-	cdr_stateI = [0, 0, 0]
-	initialI = -1
+	cdr_state_I = [0, 0, 0]
+	cdr_init_I = -1
 
-	cdr_stateQ = [0, 0, 0]
-	initialQ = -1
+	cdr_state_Q = [0, 0, 0] # not in use
+	cdr_init_Q = -1
 
-	decode_init = -1
+	decoding_init = -1
 
 	# audio buffer that stores all the audio blocks
 	audio_data = np.array([]) # used to concatenate filtered blocks (audio data)
@@ -140,7 +140,7 @@ if __name__ == "__main__":
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
 		recoveredRDSI, recoveredRDSQ, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 1.1775, 0.003, pll_block)
 
-        # RDS DEMODULATION
+        # RDS DEMODULATION (TWO PATHS FOR I AND Q TESTING)
 		mixedAudioI = mixer(recoveredRDSI, channel_Delay)
 		mixedAudioQ = mixer(recoveredRDSQ, channel_Delay)
 
@@ -150,16 +150,15 @@ if __name__ == "__main__":
 		demod_filtI, rds_rrc_blockI = block_convolution(rrc_coeff, demod_filtI, rds_rrc_blockI)
 		demod_filtQ, rds_rrc_blockQ = block_convolution(rrc_coeff, demod_filtQ, rds_rrc_blockQ)
 
-		# DO REST OF RDS AFTER BLOCK 1 (SINCE BLOCK 1 JUST FOR SET UP)
+		# DO REST OF DEMODULATION AFTER BLOCK 0 (SINCE BLOCK 0 IS BAD FOR SET UP)
 		if block_count >= 1:
-			samplesQ, manchester_values, initialQ = CDR_state(demod_filtQ, sps, initialQ)
-			samplesI, manchester_values, initialI = CDR_state(demod_filtI, sps, initialI)
-			bits, decode_init = diff_decoding(manchester_values, decode_init, cdr_stateI)
-			cdr_stateI = [manchester_values[-1], samplesI[-1], bits[-1]]
+			samplesQ, manchester_values, cdr_init_Q = CDR_state(demod_filtQ, sps, cdr_init_Q)
+			samplesI, manchester_values, cdr_init_I = CDR_state(demod_filtI, sps, cdr_init_I)
+			decoded_bits, decoding_init = diff_decoding(manchester_values, decoding_init, cdr_state_I)
+			cdr_state_I = [manchester_values[-1], samplesI[-1], decoded_bits[-1]]
 
-			#print("Last value: " + str(samplesI[-1]))
 		#Generate Plots of Monopath
-		if block_count >= 6 and block_count < 9:
+		if block_count >= 1 and block_count < 9:
 
 			# IQ CONSTELLATION PLOTS
 			in_phase = []
@@ -172,7 +171,7 @@ if __name__ == "__main__":
 				quad.append(demod_filtQ[samplesQ])
 
 			fig, ax = plt.subplots(1)
-			fig.suptitle('constellation graphs')
+			fig.suptitle('Constellation Graphs')
 
 			ax.set_xlabel("in_phase")
 			ax.set_ylabel("quadrature")
@@ -187,6 +186,7 @@ if __name__ == "__main__":
 
 			fig2, axs = plt.subplots(4)
 
+			# OTHER DEBUGGING PLOTS
 			axs[0].plot(x2, carrier_filt[:n], c='blue')
 			axs[0].plot(x1, prev2[(len(prev2)-n):], c='orange')
 			axs[0].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
@@ -204,7 +204,7 @@ if __name__ == "__main__":
 
 			axs[3].plot(range(len(demod_filtI)), demod_filtI, c='blue')
 			axs[3].plot(samplesI, np.zeros(shape = len(samplesI)), marker="o")
-			print("Length " + str(len(demod_filtI)))
+			print("Length of signal: " + str(len(demod_filtI)))
 			plt.show()
 
 		#prev1 = demod_filt
@@ -212,6 +212,7 @@ if __name__ == "__main__":
 		prevPLLI = recoveredRDSI
 		prevPLLQ = recoveredRDSQ
 		print("===================================================================")
+
 		"""
 		if block_count >= 10 and block_count < 12:
 

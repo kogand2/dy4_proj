@@ -264,15 +264,17 @@ def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.
 	Ki = (normBandwidth*normBandwidth)*Ci
 
 	# output array for the NCO
-	ncoOut = np.empty(len(pllIn)+1)
+	ncoOutI = np.empty(len(pllIn)+1)
+	ncoOutQ = np.empty(len(pllIn)+1)
 
 	# initialize internal state
 	integrator = state[0]
 	phaseEst = state[1]
 	feedbackI = state[2]
 	feedbackQ = state[3]
-	ncoOut[0] = state[4]
-	trigOffset = state[5]
+	ncoOutI[0] = state[4]
+	ncoOutQ[0] = state[5]
+	trigOffset = state[6]
 	# note: state saving will be needed for block processing
 
 
@@ -297,14 +299,15 @@ def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.
 		trigArg = (2*np.pi*(freq/Fs)*(trigOffset) + phaseEst)
 		feedbackI = math.cos(trigArg)
 		feedbackQ = math.sin(trigArg)
-		ncoOut[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
+		ncoOutI[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
+		ncoOutQ[k+1] = math.sin(trigArg*ncoScale + phaseAdjust)
 	#print(trigOffset)
-	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOut[-1], trigOffset]
+	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOutI[-1], ncoOutQ[-1], trigOffset]
 
 	# for stereo only the in-phase NCO component should be returned
 	# for block processing you should also return the state
 	#print(ncoOut)
-	return ncoOut, new_state
+	return ncoOutI, ncoOutQ, new_state
 	# for RDS add also the quadrature NCO component to the output
 
 def mixer(recoveredStereo, channel_filt):

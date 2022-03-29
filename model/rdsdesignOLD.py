@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0_2400.raw"
+	in_fname = "../data/samples3.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -83,21 +83,14 @@ if __name__ == "__main__":
 	carrier_block = np.zeros(shape=len(carrier_coeff))	#For Carrier Recovery
 	channel_block = np.zeros(shape=len(channel_coeff))	#For Channel Extraction
 	delay_block = np.zeros(shape=((audio_taps-1)//2))		#For All pass filter
-	rds_demod_blockI =np.zeros(shape=len(rds_demod_coeff))	#For Demodulation Resampler
-	rds_demod_blockQ =np.zeros(shape=len(rds_demod_coeff))	#For Demodulation Resampler
-	rds_rrc_blockI = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
-	rds_rrc_blockQ = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
+	rds_demod_block =np.zeros(shape=len(rds_demod_coeff))	#For Demodulation Resampler
+	rds_rrc_block = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
 
-	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0])
+	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 0.0])
 	prevCarrier = np.zeros(shape=5121)
 	prevCarrier = np.zeros(shape=5120)
-
-	cdr_stateI = [0, 0]
-	initialI = -1
-
-	cdr_stateQ = [0, 0]
-	initialQ = -1
-
+	cdr_state = 0
+	initial = -1
 	decode_init = -1
 
 	# audio buffer that stores all the audio blocks
@@ -138,36 +131,32 @@ if __name__ == "__main__":
 		# UPPER PATH OF RDS CARRIER RECOVERY:
 		carrier_Input = sq_nonlinearity(channel_filt)
 		carrier_filt, carrier_block = block_convolution(carrier_coeff, carrier_Input, carrier_block)
-		recoveredRDSI, recoveredRDSQ, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 1.1775, 0.003, pll_block)
+		recoveredRDS, pll_block = fmPll(carrier_filt, 114e3, rf_Fs/rf_decim, 0.5, 0.1775, 0.005, pll_block)
 
         # RDS DEMODULATION
-		mixedAudioI = mixer(recoveredRDSI, channel_Delay)
-		mixedAudioQ = mixer(recoveredRDSQ, channel_Delay)
+		mixedAudio = mixer(recoveredRDS, channel_Delay)
+		demod_filt, rds_demod_block = rs_block_convolution(rds_demod_coeff, mixedAudio, rds_demod_block, demod_decim, demod_exp)
+		demod_filt, rds_rrc_block = block_convolution(rrc_coeff, demod_filt, rds_rrc_block)
 
-		demod_filtI, rds_demod_blockI = rs_block_convolution(rds_demod_coeff, mixedAudioI, rds_demod_blockI, demod_decim, demod_exp)
-		demod_filtQ, rds_demod_blockQ = rs_block_convolution(rds_demod_coeff, mixedAudioQ, rds_demod_blockQ, demod_decim, demod_exp)
-
-		demod_filtI, rds_rrc_blockI = block_convolution(rrc_coeff, demod_filtI, rds_rrc_blockI)
-		demod_filtQ, rds_rrc_blockQ = block_convolution(rrc_coeff, demod_filtQ, rds_rrc_blockQ)
+		if (block_count >= 1):
+			samples, manchester_values, cdr_state, initial = CDR_state(demod_filt, sps, cdr_state, initial)
 
 		# DO REST OF RDS AFTER BLOCK 1 (SINCE BLOCK 1 JUST FOR SET UP)
-		if block_count >= 1:
-			samplesQ, manchester_values, cdr_stateQ, initialQ = CDR_state(demod_filtQ, sps, cdr_stateQ, initialQ)
-			samplesI, manchester_values, cdr_stateI, initialI = CDR_state(demod_filtI, sps, cdr_stateI, initialI)
-			bits, decode_init = diff_decoding(manchester_values, decode_init, cdr_stateI)
+			bits, decode_init = diff_decoding(manchester_values, decode_init)
 
 		#Generate Plots of Monopath
-		if block_count >= 4 and block_count < 6:
+		prev1 = demod_filt
+		prev2 = carrier_filt
+		prevPLL = recoveredRDS
+		if block_count >= 6 and block_count < 8:
+			#print(len(samples))
+			#print(manchester_values)
+			i_samples = []
+			q_samples = []
 
-			# IQ CONSTELLATION PLOTS
-			in_phase = []
-			quad = []
-
-			for i in range(len(demod_filtI)):
-				in_phase.append(demod_filtI[samplesI])
-
-			for i in range(len(demod_filtQ)):
-				quad.append(demod_filtQ[samplesQ])
+			for i in range(0, len(demod_filt), 1):
+				i_samples.append(math.sin(demod_filt[i]))
+				q_samples.append(math.cos(demod_filt[i]))
 
 			fig, ax = plt.subplots(1)
 			fig.suptitle('constellation graphs')
@@ -175,40 +164,35 @@ if __name__ == "__main__":
 			ax.set_xlabel("in_phase")
 			ax.set_ylabel("quadrature")
 
-			ax.scatter(in_phase, quad, s=10)
-			ax.set_xlim([-1,1])
-			ax.set_ylim([-1,1])
+			#ax.scatter(i_samples, q_samples, s=10)
+			ax.plot(range(len(i_samples)), i_samples)
+			ax.plot(range(len(q_samples)), q_samples)
 
 			n = 100
 			x1 = range(n)
 			x2 = range(n,n+n)
-
-			fig2, axs = plt.subplots(4)
-
-			axs[0].plot(x2, carrier_filt[:n], c='blue')
-			axs[0].plot(x1, prev2[(len(prev2)-n):], c='orange')
-			axs[0].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
+			fig2, axs = plt.subplots(3)
+			fig2.suptitle('State saving checking')
+			axs[0].plot(range(len(demod_filt)), demod_filt, c='blue')
+			#axs[0].plot(x1, prev1[(len(prev1)-n):], c='orange')
+			#axs[0].plot(sampling_intervals, np.zeros(shape = len(sampling_intervals)), marker="x", c='orange', markersize=15)
+			axs[0].plot(samples, np.zeros(shape = len(samples)), marker="o")
+			#print(manchester_values)
+			axs[0].set_title('', fontstyle='italic',fontsize='medium')
 			axs[0].axhline(y = 0, color = 'r', linestyle = '-')
 
-			axs[1].plot(x2, recoveredRDSI[:n], c='blue')
-			axs[1].plot(x1, prevPLLI[(len(prevPLLI)) - n:], c='orange')
-			axs[1].set_title('PLL', fontstyle='italic',fontsize='medium')
+			axs[1].plot(x2, carrier_filt[:n], c='blue')
+			axs[1].plot(x1, prev2[(len(prev2)-n):], c='orange')
+			axs[1].set_title('Mixed Audio', fontstyle='italic',fontsize='medium')
 			axs[1].axhline(y = 0, color = 'r', linestyle = '-')
 
-			axs[2].plot(x2, recoveredRDSQ[:n], c='blue')
-			axs[2].plot(x1, prevPLLQ[(len(prevPLLQ)) - n:], c='orange')
+			axs[2].plot(x2, recoveredRDS[:n], c='blue')
+			axs[2].plot(x1, prevPLL[(len(prevPLL)) - n:], c='orange')
 			axs[2].set_title('PLL', fontstyle='italic',fontsize='medium')
 			axs[2].axhline(y = 0, color = 'r', linestyle = '-')
 
-			axs[3].plot(range(len(demod_filtI)), demod_filtI, c='blue')
-			axs[3].plot(samplesI, np.zeros(shape = len(samplesI)), marker="o")
-			print("Length " + str(len(demod_filtI)))
 			plt.show()
 
-		#prev1 = demod_filt
-		prev2 = carrier_filt
-		prevPLLI = recoveredRDSI
-		prevPLLQ = recoveredRDSQ
 
 		if block_count >= 10 and block_count < 12:
 

@@ -264,17 +264,15 @@ def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.
 	Ki = (normBandwidth*normBandwidth)*Ci
 
 	# output array for the NCO
-	ncoOutI = np.empty(len(pllIn)+1)
-	ncoOutQ = np.empty(len(pllIn)+1)
+	ncoOut = np.empty(len(pllIn)+1)
 
 	# initialize internal state
 	integrator = state[0]
 	phaseEst = state[1]
 	feedbackI = state[2]
 	feedbackQ = state[3]
-	ncoOutI[0] = state[4]
-	ncoOutQ[0] = state[5]
-	trigOffset = state[6]
+	ncoOut[0] = state[4]
+	trigOffset = state[5]
 	# note: state saving will be needed for block processing
 
 
@@ -299,15 +297,14 @@ def fmPll(pllIn, freq, Fs, ncoScale = 2.0, phaseAdjust = 0.0, normBandwidth = 0.
 		trigArg = (2*np.pi*(freq/Fs)*(trigOffset) + phaseEst)
 		feedbackI = math.cos(trigArg)
 		feedbackQ = math.sin(trigArg)
-		ncoOutI[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
-		ncoOutQ[k+1] = math.sin(trigArg*ncoScale + phaseAdjust)
+		ncoOut[k+1] = math.cos(trigArg*ncoScale + phaseAdjust)
 	#print(trigOffset)
-	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOutI[-1], ncoOutQ[-1], trigOffset]
+	new_state = [integrator, phaseEst, feedbackI, feedbackQ, ncoOut[-1], trigOffset]
 
 	# for stereo only the in-phase NCO component should be returned
 	# for block processing you should also return the state
 	#print(ncoOut)
-	return ncoOutI, ncoOutQ, new_state
+	return ncoOut, new_state
 	# for RDS add also the quadrature NCO component to the output
 
 def mixer(recoveredStereo, channel_filt):
@@ -325,43 +322,125 @@ def sq_nonlinearity(signalIn):
 
 	return output #remember output will have a squared half amplitude and a positve offset of the same mag
 
-
+'''
+def CDR(signalIn, interval):
+	samples = np.empty([])
+	max = 0
+	index = 0;
+	for i in range(len(signalIn)):
+		if i % interval == 0 and i != 0:
+			print(i)
+			samples = np.append(samples, index)
+			max = 0
+		else:
+			if max < abs(signalIn[i]):
+				max = abs(signalIn[i])
+				index = i
+	return samples
+'''
 
 '''
-def diff_decoding(manchester_values, initial, cdr_state):
+def CDR(signalIn, interval):
+	samples = np.empty([])
+	interval_ctr = 0
+	for i in range(len(signalIn):
+		interval_range = range(i, i+interval_ctr)
+		if ((signalIn[i-1]>=0 && signalIn[i]<=0) || (signalIn[i-1]>=0 && signalIn[i]<=0)):
+			interval_ctr = 0
+
+		if (interval_ctr>=34):
+			sampling_interval = interval_ctr//3
+			samples.append(i+sampling_interval)
+			samples.append(i+(2*sampling_interval))
+		else:
+			samples.append((i+interval_ctr)//2)
+
+		interval_ctr+=1
+'''
+
+'''
+def CDR(signalIn, interval):
+	#signalIn is at y=0 when x=17, 32, 45, 78, 100
+	sampling_intervals = []
+	samples = []
+
+
+	for k in range(1, len(signalIn)-1):
+		if ((signalIn[k-1]>0 and signalIn[k+1]<0) or (signalIn[k-1]<0 and signalIn[k+1]>0)):
+			if (sampling_intervals):
+				if (k-1 == sampling_intervals[-1]):
+					previous = sampling_intervals.pop(-1)
+					midpoint = (k + previous)/2
+					sampling_intervals.append(midpoint)
+				else:
+					sampling_intervals.append(k)
+			else:
+				sampling_intervals.append(k)
+				#sampling_intervals = [17, 32, 45, 78, 100]
+
+	for i in range(len(sampling_intervals)-1):
+		interval_range = sampling_intervals[i:i+2]
+		#print("int range", interval_range)
+		#interval_range = [17, 32]
+		if ((interval_range[1]-interval_range[0]) >= 34):
+			subInterval = (interval_range[1] - interval_range[0])//3
+			samples.append(sampling_intervals[i]+subInterval)
+			#samples.append(sampling_intervals[i]+subInterval)
+			samples.append(sampling_intervals[i]+(2*subInterval))
+			#samples.append(sampling_intervals[i]+(2*subInterval))
+		else:
+			samples.append(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)
+			#samples.append((sampling_intervals[i]+len(interval_range))//2)
+
+	return samples, sampling_intervals
+'''
+'''
+def diff_decoding(manchester_values):
 	bits = []
 	decoded_bits = []
 
-	print("THIS IS MANCHESTER")
-	print(manchester_values)
-	print("Manchester Length: " + str(len(manchester_values)))
-
-
-	ind1 = 0
-	ind2 = 0
-
 	for i in range(0, len(manchester_values) - 1, 2):
-		if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
-			ind1 += 1
-		elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
-			ind1 += 1
+		if manchester_values[i] == 0 and manchester_values[i+1] == 1:
+			bits.append(0)
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 0:
+			bits.append(1)
 
-	for i in range(1, len(manchester_values) - 1, 2):
-		if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
-			ind2 += 1
-		elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
-			ind2 += 1
+	decoded_bits.append(bits[0])
+	print(bits)
+	for i in range(1, len(bits)):
+		decoded_bits.append(bits[i] ^ bits[i-1])
+	print(decoded_bits)
+	return decoded_bits
+'''
 
-	if (ind1 > ind2):
-		initial = 1
-	else:
-		initial = 0
-		manchester_values.insert(0, cdr_state[0])
+def diff_decoding(manchester_values, initial):
+	bits = []
+	decoded_bits = []
 
+	if (initial == -1):
+		ind1 = 0
+		ind2 = 0
+
+		for i in range(0, len(manchester_values) - 1, 2):
+			if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+				ind1 += 1
+			elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+				ind1 += 1
+
+		for i in range(1, len(manchester_values), 2):
+			if manchester_values[i] == 1 and manchester_values[i+1] == 1: # HH (ignore)
+				ind2 += 1
+			elif manchester_values[i] == 0 and manchester_values[i+1] == 0: # LL (ignore)
+				ind2 += 1
+
+		if (ind1 > ind2):
+			initial = 1
+		else:
+			initial = 0
 
 	print("CHOSE : " +str(initial))
 	#print(manchester_values)
-	for i in range(initial, len(manchester_values) - 1, 2):
+	for i in range(initial, len(manchester_values) - initial, 2):
 		if manchester_values[i] == 0 and manchester_values[i+1] == 1:	# LH = 0
 			bits.append(0)
 		elif manchester_values[i] == 1 and manchester_values[i+1] == 0: # HL = 1
@@ -381,49 +460,110 @@ def diff_decoding(manchester_values, initial, cdr_state):
 
 	print("THIS IS DECODED")
 	print(decoded_bits)
-	print("Decoded Length: " + str(len(decoded_bits)))
-	print("===================================================================")
+	print("Length: " + str(len(decoded_bits)))
+	print("THIS IS MANCHESTER")
+	print(manchester_values)
+	print("Length: " + str(len(manchester_values)))
 	return decoded_bits, initial
 
 def CDR_state(signalIn, interval, cdr_state, initial):
 
 	samples = []				# x vals (just for testing)
-	sample_vals = []	# y vals (manchester_values)
+	sample_vals = [cdr_state]	# y vals (manchester_values)
 	best_init = initial			# index sampling starts from
 
 	# processing first block, find best initial point to start sampling
-	max = 0.0
-	curr = 0.0
-	best_init = 0
-	# testing from 0 to 17 or xx?
-	for initial in range(0, interval):
-		# reset for next vals
+	if (initial == -1):
+		max = 0.0
 		curr = 0.0
-		for i in range(initial, len(signalIn), interval):
-			curr += abs(signalIn[i])
+		best_init = 0
+		# testing from 0 to 17 or xx?
+		for initial in range(0, interval):
+			# reset for next vals
+			curr = 0.0
+			for i in range(initial, len(signalIn), interval):
+				curr += abs(signalIn[i])
 
-		#print("FOR INIITAL POINT = " + str(initial) + " : " + str(curr))
-		if (max < curr):
-			max = curr
-			best_init = initial
+			#print("FOR INIITAL POINT = " + str(initial) + " : " + str(curr))
+			if (max < curr):
+				max = curr
+				best_init = initial
 
-	#else:
-	#	best_init = interval - (len(signalIn) - cdr_state[1])
-
-		#print("THIS IS THE MAX " + str(max))
-	print("BEST INITIAL: " + str(best_init))
+		print("THIS IS THE MAX " + str(max))
 	# processing rest of blocks
-	for i in range(best_init, len(signalIn), interval):
+	for i in range(initial, len(signalIn), interval):
 		samples.append(i)
 		if (signalIn[i] > 0):	# get a HI
 			sample_vals.append(1)
 		else:					# get a LO
 			sample_vals.append(0)
 
-	cdr_state = [sample_vals[-1], samples[-1]]
-	print("===================================================================")
+	cdr_state = sample_vals[-1]
+
 	return samples, sample_vals, cdr_state, best_init
+
 '''
+	for i in range(0, len(manchester_values) - 1, 2):
+		# change the two H's into one H
+		if manchester_values[i] == 1 and manchester_values[i+1] == 1:
+			sample_vals
+		elif manchester_values[i] == 1 and manchester_values[i+1] == 1:
+			'''
+
+
+
+
+'''
+def CDR_state(signalIn, interval, cdr_state):
+	#signalIn is at y=0 when x=17, 32, 45, 78, 100
+	sampling_intervals = []
+	samples = []
+	sample_vals = [cdr_state]
+
+
+	for k in range(1, len(signalIn)-1):
+		if ((signalIn[k-1]>0 and signalIn[k+1]<0) or (signalIn[k-1]<0 and signalIn[k+1]>0)):
+			if (sampling_intervals):
+				if (k-1 == sampling_intervals[-1]):
+					previous = sampling_intervals.pop(-1)
+					midpoint = (k + previous)/2
+					sampling_intervals.append(midpoint)
+				else:
+					sampling_intervals.append(k)
+			else:
+				sampling_intervals.append(k)
+				#sampling_intervals = [17, 32, 45, 78, 100]
+
+	for i in range(len(sampling_intervals)-1):
+		interval_range = sampling_intervals[i:i+2]
+		#print("int range", interval_range)
+		#interval_range = [17, 32]
+		if ((interval_range[1]-interval_range[0]) >= 34):
+			subInterval = (interval_range[1] - interval_range[0])//3
+			if signalIn[math.ceil(sampling_intervals[i]+subInterval)] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+subInterval)
+			#samples.append(sampling_intervals[i]+subInterval)
+			if signalIn[math.ceil(sampling_intervals[i]+(2*subInterval))] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+(2*subInterval))
+			#samples.append(sampling_intervals[i]+(2*subInterval))
+		else:
+			if signalIn[math.ceil(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)] > 0:
+				sample_vals.append(1)
+			else:
+				sample_vals.append(0)
+			samples.append(sampling_intervals[i]+(interval_range[1] - interval_range[0])//2)
+			#samples.append((sampling_intervals[i]+len(interval_range))//2)
+
+	cdr_state = 1 - sample_vals[-1]
+	return samples, sampling_intervals, sample_vals, cdr_state
+'''
+
 #======================================= from lab 3 =======================================
 def DFT(x):
 

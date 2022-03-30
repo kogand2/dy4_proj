@@ -443,16 +443,16 @@ def frame_sync(decoded_bits, prev_decoded):
 	else:
 		#print("This is the obtained bit_stream")
 		bit_stream = np.append(prev_decoded, decoded_bits)
-		#print(bit_stream)
-		#print(len(bit_stream))
+		print(bit_stream)
+		print(len(bit_stream))
 	if len(bit_stream) >=  26:
 		block = ["A","B","C","D"]
 
 		for i in range(len(bit_stream) - 25):
 			check = bit_stream[i:26+i]
-			#print("This is obtained check")
-			#print(check)
-			#print(i)
+			print("This is obtained check")
+			print(check)
+			print(i)
 			for k in range(4):
 				message = check
 				#for j in range(len(check)):
@@ -463,9 +463,9 @@ def frame_sync(decoded_bits, prev_decoded):
 				if np.array_equal(message, getSyndrome(k)):
 					print("CORRECT SYNDROME OBTAINED")
 					print("obtained: " + block[k] + " " + str(i))
-					return block[k], i, decoded_bits
+					#return block[k], i, bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits) - (len(bit_stream) - 26 - i):]
 
-
+	#print(len(bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits):]))
 	return None, start_point, bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits):]
 
 

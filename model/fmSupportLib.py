@@ -441,22 +441,24 @@ def frame_sync(decoded_bits, prev_decoded):
 	if len(prev_decoded) == 0:
 		return None, start_point, decoded_bits
 	else:
+		#print("This is the obtained bit_stream")
 		bit_stream = np.append(prev_decoded, decoded_bits)
 		#print(bit_stream)
+		#print(len(bit_stream))
 	if len(bit_stream) >=  26:
 		block = ["A","B","C","D"]
 
-		for i in range(len(bit_stream) - 26):
+		for i in range(len(bit_stream) - 25):
 			check = bit_stream[i:26+i]
-			print("This is obtained check")
-			print(check)
-			print(len(check))
+			#print("This is obtained check")
+			#print(check)
+			#print(i)
 			for k in range(4):
-				message = np.array([])
-				for j in range(len(check)):
-					message = np.append(message, int(check[j]) ^ int(getOffset(k)[j]))
-				print("This is the message after offset")
-				print(message)
+				message = check
+				#for j in range(len(check)):
+				#	message = np.append(message, int(check[j]) ^ int(getOffset(k)[j]))
+				#print("This is the message after offset")
+				#print(message)
 				message = matrixMult(message, getParityCheck())
 				if np.array_equal(message, getSyndrome(k)):
 					print("CORRECT SYNDROME OBTAINED")
@@ -464,7 +466,7 @@ def frame_sync(decoded_bits, prev_decoded):
 					return block[k], i, decoded_bits
 
 
-	return None, start_point, decoded_bits
+	return None, start_point, bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits):]
 
 
 def matrixMult(x, y):
@@ -480,11 +482,11 @@ def matrixMult(x, y):
 			#print(str(x[k]) + " and " + str(y[i][k]))
 			#print(k)
 			if k == 0:
-				value = (int(x[k]) and y[i][k])
+				value = (int(x[k]) and y[k][i])
 			else:
 				value = value ^ (int(x[k]) and y[k][i])
 		result = np.append(result, value)
-	print(result)
+	#print(result)
 	return result
 
 def getParityCheck():

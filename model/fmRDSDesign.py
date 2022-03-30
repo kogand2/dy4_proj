@@ -160,7 +160,7 @@ if __name__ == "__main__":
 			cdr_state_I = [manchester_values[-1], samplesI[-1], decoded_bits[-1]]
 			block, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
 		#Generate Plots of Monopath
-		if block_count >= 2 and block_count < 11:
+		if block_count >= 2 and block_count < 3:
 
 			# IQ CONSTELLATION PLOTS
 			in_phase = []

@@ -448,23 +448,44 @@ def frame_sync(decoded_bits, prev_decoded):
 
 		for i in range(len(bit_stream) - 26):
 			check = bit_stream[i:26+i]
+			print("This is obtained check")
+			print(check)
+			print(len(check))
 			for k in range(4):
 				message = np.array([])
 				for j in range(len(check)):
-					message = np.append(message, check[j] ^ getOffset(k)[j])
-				print("This is obtained message")
+					message = np.append(message, int(check[j]) ^ int(getOffset(k)[j]))
+				print("This is the message after offset")
 				print(message)
-				message = np.matmul(message, getParityCheck())
+				message = matrixMult(message, getParityCheck())
 				if np.array_equal(message, getSyndrome(k)):
+					print("CORRECT SYNDROME OBTAINED")
 					print("obtained: " + block[k] + " " + str(i))
 					return block[k], i, decoded_bits
 
-				print("This is expected syndrome")
-				print(getSyndrome(k))
+
 	return None, start_point, decoded_bits
 
 
+def matrixMult(x, y):
+	# This is not a generic matrix multiplication
+	# This is build specificaly for bits and expected dimensions
 
+	result = np.array([])
+	value = 0
+	# iterate through columns of y
+	for i in range(len(y[0])):# iterate through columns of x and rows of y
+
+		for k in range(len(x)):
+			#print(str(x[k]) + " and " + str(y[i][k]))
+			#print(k)
+			if k == 0:
+				value = (int(x[k]) and y[i][k])
+			else:
+				value = value ^ (int(x[k]) and y[k][i])
+		result = np.append(result, value)
+	print(result)
+	return result
 
 def getParityCheck():
 	parityCheck = np.array([[1,0,0,0,0,0,0,0,0,0],\

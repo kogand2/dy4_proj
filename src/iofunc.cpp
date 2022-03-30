@@ -11,7 +11,7 @@ Ontario, Canada
 
 // some basic functions for printing information from vectors
 // or to read from/write to binary files in 32-bit float format
-void printRealVector(const std::vector<float> &x)
+void printRealVector(const std::vector<int> &x)
 {
 	std::cerr << "Printing float vector of size " << x.size() << "\n";
 	for (unsigned int i = 0; i < x.size(); i ++)

@@ -87,10 +87,12 @@ if __name__ == "__main__":
 	rds_demod_blockQ =np.zeros(shape=len(rds_demod_coeff))	#For Demodulation Resampler
 	rds_rrc_blockI = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
 	rds_rrc_blockQ = np.zeros(shape=len((rrc_coeff)))			#For RRC convolution
+	prev_decoded = np.array([])							#for frame sync
 
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0])
 	prevCarrier = np.zeros(shape=5121)
-	prevCarrier = np.zeros(shape=5120)
+
+
 
 	cdr_state_I = [0, 0, 0]
 	cdr_init_I = -1
@@ -156,7 +158,7 @@ if __name__ == "__main__":
 			samplesI, manchester_values, cdr_init_I = CDR_state(demod_filtI, sps, cdr_init_I)
 			decoded_bits, decoding_init = diff_decoding(manchester_values, decoding_init, cdr_state_I)
 			cdr_state_I = [manchester_values[-1], samplesI[-1], decoded_bits[-1]]
-
+			block, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
 		#Generate Plots of Monopath
 		if block_count >= 1 and block_count < 9:
 

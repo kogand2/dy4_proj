@@ -361,7 +361,7 @@ def diff_decoding(manchester_values, initial, cdr_state):
 		manchester_values.insert(0, cdr_state[0])
 		start_index = 0
 
-	#print("CHOSE : " +str(initial))
+	#print("CHOSE : " +str(start_index))
 	#print(manchester_values)
 	for i in range(start_index, len(manchester_values) - 1, 2):
 		if manchester_values[i] == 0 and manchester_values[i+1] == 1:	# LH = 0
@@ -391,8 +391,12 @@ def diff_decoding(manchester_values, initial, cdr_state):
 	#print(manchester_values)
 	#print("Manchester Length: " + str(len(manchester_values)))
 
-	#print("THIS IS DECODED")
-	#print(decoded_bits)
+	#print("THIS IS CDR State")
+	#print(cdr_state)
+	#print("Manchester Length: " + str(len(cdr_state)))
+
+	print("THIS IS DECODED")
+	print(decoded_bits)
 	print("Decoded Length: " + str(len(decoded_bits)))
 	#print("===================================================================")
 	return decoded_bits, initial
@@ -431,6 +435,79 @@ def CDR_state(signalIn, interval, initial):
 
 	#print("===================================================================")
 	return samples, sample_vals, best_init
+
+def frame_sync(decoded_bits, prev_decoded):
+	start_point = 0 #relative to bit stream
+	if len(prev_decoded) == 0:
+		return None, start_point, decoded_bits
+	else:
+		bit_stream = np.append(prev_decoded, decoded_bits)
+		#print(bit_stream)
+	if len(bit_stream) >=  26:
+		block = ["A","B","C","D"]
+
+		for i in range(len(bit_stream) - 26):
+			check = bit_stream[i:26+i]
+			for k in range(4):
+				check = np.add(check, getOffset(k))
+				print(len(check))
+				print(check)
+				check = np.matmul(check, getParityCheck())
+				if np.array_equal(check,getSyndrome(k)):
+					print("obtained: " + block[k] + " " + str(i))
+					return block[k], i, decoded_bits
+	else:
+		return None, start_point, decoded_bits
+
+
+
+def getParityCheck():
+	parityCheck = np.array([[1,0,0,0,0,0,0,0,0,0],\
+	[0,1,0,0,0,0,0,0,0,0],\
+	[0,0,1,0,0,0,0,0,0,0],\
+	[0,0,0,1,0,0,0,0,0,0],\
+	[0,0,0,0,1,0,0,0,0,0],\
+	[0,0,0,0,0,1,0,0,0,0],\
+	[0,0,0,0,0,0,1,0,0,0],\
+	[0,0,0,0,0,0,0,1,0,0],\
+	[0,0,0,0,0,0,0,0,1,0],\
+	[0,0,0,0,0,0,0,0,0,1],\
+	[1,0,1,1,0,1,1,1,0,0],\
+	[0,1,0,1,1,0,1,1,1,0],\
+	[0,0,1,0,1,1,0,1,1,1],\
+	[1,0,1,0,0,0,0,1,1,1],\
+	[1,1,1,0,0,1,1,1,1,1],\
+	[1,1,0,0,0,1,0,0,1,1],\
+	[1,1,0,1,0,1,0,1,0,1],\
+	[1,1,0,1,1,1,0,1,1,0],\
+	[0,1,1,0,1,1,1,0,1,1],\
+	[1,0,0,0,0,0,0,0,0,1],\
+	[1,1,1,1,0,1,1,1,0,0],\
+	[0,1,1,1,1,0,1,1,1,0],\
+	[0,0,1,1,1,1,0,1,1,1],\
+	[1,0,1,0,1,0,0,1,1,1],\
+	[1,1,1,0,0,0,1,1,1,1],\
+	[1,1,0,0,0,1,1,0,1,1]])
+	print(len(parityCheck))
+	return parityCheck
+
+def getOffset(row):
+	#Offset array
+	offset = np.array([[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,0,0],\
+	[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1,1,0,0,0],\
+	[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,1,1,0,1,0,0,0],\
+	[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,0,1,1,0,1,0,0]])
+
+	return offset[row]
+
+def getSyndrome(row):
+	#expected Syndrome array
+	expSyndrome = np.array([[1,1,1,1,0,1,1,0,0,0],\
+	[1,1,1,1,0,1,0,1,0,0],\
+	[1,0,0,1,0,1,1,1,0,0],\
+	[1,0,0,1,0,1,1,0,0,0]])
+
+	return expSyndrome[row]
 
 #======================================= from lab 3 =======================================
 def DFT(x):

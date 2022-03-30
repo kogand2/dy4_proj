@@ -449,15 +449,20 @@ def frame_sync(decoded_bits, prev_decoded):
 		for i in range(len(bit_stream) - 26):
 			check = bit_stream[i:26+i]
 			for k in range(4):
-				check = np.add(check, getOffset(k))
-				print(len(check))
-				print(check)
-				check = np.matmul(check, getParityCheck())
-				if np.array_equal(check,getSyndrome(k)):
+				message = np.array([])
+				for j in range(len(check)):
+					message = np.append(message, check[j] ^ getOffset(k)[j])
+				print("This is obtained message")
+				print(message)
+				message = np.matmul(message, getParityCheck())
+				if np.array_equal(message, getSyndrome(k)):
 					print("obtained: " + block[k] + " " + str(i))
 					return block[k], i, decoded_bits
-	else:
-		return None, start_point, decoded_bits
+
+				print("This is expected syndrome")
+				print(getSyndrome(k))
+	return None, start_point, decoded_bits
+
 
 
 
@@ -488,7 +493,6 @@ def getParityCheck():
 	[1,0,1,0,1,0,0,1,1,1],\
 	[1,1,1,0,0,0,1,1,1,1],\
 	[1,1,0,0,0,1,1,0,1,1]])
-	print(len(parityCheck))
 	return parityCheck
 
 def getOffset(row):

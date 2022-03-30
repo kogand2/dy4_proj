@@ -379,13 +379,17 @@ def diff_decoding(manchester_values, initial, cdr_state):
 			#print("Consecutive LO")
 			pass
 
+
 	if not is_first_block:
-		decoded_bits.append(cdr_state[2])
+		bits.insert(0, cdr_state[2])
+
 	else:
 		decoded_bits.append(bits[0])
 
 	for i in range(1, len(bits)):
 		decoded_bits.append(bits[i] ^ bits[i-1])
+		print(i)
+
 
 	#print("THIS IS MANCHESTER")
 	#print(manchester_values)
@@ -395,11 +399,11 @@ def diff_decoding(manchester_values, initial, cdr_state):
 	#print(cdr_state)
 	#print("Manchester Length: " + str(len(cdr_state)))
 
-	print("THIS IS DECODED")
-	print(decoded_bits)
-	print("Decoded Length: " + str(len(decoded_bits)))
+	#print("THIS IS DECODED")
+	#print(decoded_bits)
+	#print("Decoded Length: " + str(len(decoded_bits)))
 	#print("===================================================================")
-	return decoded_bits, initial
+	return decoded_bits, initial, bits[-1]
 
 def CDR_state(signalIn, interval, initial):
 
@@ -443,30 +447,21 @@ def frame_sync(decoded_bits, prev_decoded):
 	else:
 		#print("This is the obtained bit_stream")
 		bit_stream = np.append(prev_decoded, decoded_bits)
-		print(bit_stream)
-		print(len(bit_stream))
+		#print(bit_stream)
+		#print(len(bit_stream))
 	if len(bit_stream) >=  26:
 		block = ["A","B","C","D"]
-
 		for i in range(len(bit_stream) - 25):
 			check = bit_stream[i:26+i]
-			print("This is obtained check")
-			print(check)
-			print(i)
+			message = matrixMult(check, getParityCheck())
 			for k in range(4):
-				message = check
-				#for j in range(len(check)):
-				#	message = np.append(message, int(check[j]) ^ int(getOffset(k)[j]))
-				#print("This is the message after offset")
-				#print(message)
-				message = matrixMult(message, getParityCheck())
 				if np.array_equal(message, getSyndrome(k)):
 					print("CORRECT SYNDROME OBTAINED")
 					print("obtained: " + block[k] + " " + str(i))
-					#return block[k], i, bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits) - (len(bit_stream) - 26 - i):]
+					#return block[k], i, decoded_bits
 
-	#print(len(bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits):]))
-	return None, start_point, bit_stream[len(bit_stream) - (26 - len(decoded_bits) - 1) - len(decoded_bits):]
+
+	return None, start_point, bit_stream[len(bit_stream) - 25:]
 
 
 def matrixMult(x, y):

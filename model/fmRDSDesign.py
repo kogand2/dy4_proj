@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples0_2400.raw"
+	in_fname = "../data/samples3.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -156,9 +156,10 @@ if __name__ == "__main__":
 		if block_count >= 1:
 			samplesQ, manchester_values, cdr_init_Q = CDR_state(demod_filtQ, sps, cdr_init_Q)
 			samplesI, manchester_values, cdr_init_I = CDR_state(demod_filtI, sps, cdr_init_I)
-			decoded_bits, decoding_init = diff_decoding(manchester_values, decoding_init, cdr_state_I)
-			cdr_state_I = [manchester_values[-1], samplesI[-1], decoded_bits[-1]]
+			decoded_bits, decoding_init, last_bit = diff_decoding(manchester_values, decoding_init, cdr_state_I)
+			cdr_state_I = [manchester_values[-1], samplesI[-1], last_bit]
 			block, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
+
 		#Generate Plots of Monopath
 		if block_count >= 2 and block_count < 3:
 

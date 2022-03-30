@@ -74,7 +74,7 @@ std::vector<float> rds_path_main(int mode){
 	band_pass_coeff(54000, 60000, rf_Fs/rf_decim, audio_taps, channel_coeff);
 	low_pass_coeff((rf_Fs/rf_decim)*demod_exp, 3000, audio_taps*demod_exp, rds_demod_coeff);
   rrc_coeff(rds_sr, rf_taps, rds_rrc_coeff);
-	int block_size = 102400;
+	int block_size = 38400*2;
 
   // regular IQ data
   std::vector<float> i_data, q_data;
@@ -132,6 +132,11 @@ std::vector<float> rds_path_main(int mode){
 
   float prev_phase = 0.0;
 
+  int cdr_init = -1;
+  int decode_init = -1;
+  std::vector<int> cdr_state = {0, 0, 0};
+  std::vector<int> sample_idxs, man_encoding, decoded_bits;
+
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
 		std::vector<float> block_data(block_size);
@@ -167,7 +172,6 @@ std::vector<float> rds_path_main(int mode){
     // perform demodulation on IQ data
     IQ_demod = fmDemodArctan(i_ds, q_ds, prev_phase);
 
-
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();
     RF_run_time += stop_time-start_time;
@@ -184,17 +188,21 @@ std::vector<float> rds_path_main(int mode){
 
 		state_block_conv(carrier_filt, carrier_input, carrier_coeff, carrier_state);
 
-		fmPll(carrier_filt, recoveredRDS, pll_state, 114e3, rf_Fs/rf_decim, 0.5, 0.0, 0.001);
+		fmPll(carrier_filt, recoveredRDS, pll_state, 114e3, rf_Fs/rf_decim, 0.5, 1.1775, 0.003);
 
     //RDS Demodulation: mixer -> digital filtering (lowpass -> resampler) -> rrc -> CDR
-		mixer(recoveredRDS, channel_filt, mixed_audio);
+		mixer(recoveredRDS, channel_delay, mixed_audio);
 
     rds_demod_block.clear();
     rs_block_conv(rds_demod_filt, mixed_audio, rds_demod_coeff, rds_demod_state, demod_decim, demod_exp, rds_demod_block);
-
     state_block_conv(rrc_demod_filt, rds_demod_block, rds_rrc_coeff, rds_rrc_state);
-    printRealVector(rrc_demod_filt);
-    break;
+
+    if (block_id >= 1){
+      CDR(rrc_demod_filt, sps, cdr_init, sample_idxs, man_encoding);
+      diff_decoding(man_encoding, cdr_state, decoded_bits, decode_init);
+      printRealVector(decoded_bits);
+      cdr_state = {man_encoding[man_encoding.size() - 1], sample_idxs[sample_idxs.size() - 1], decoded_bits[decoded_bits.size() - 1]};
+    }
     //...
 
     // timing analysis

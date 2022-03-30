@@ -329,3 +329,107 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
   std::chrono::duration<double, std::milli> NFT_run_time = stop_time-start_time;
   //std::cerr << "STATE SAVING RUNTIME: " << NFT_run_time.count() << " ms" << "\n";
 }
+
+void CDR(std::vector<float> signalIn, int interval, int &initial, std::vector<int> &sample_idxs, std::vector<int> &man_encoding){
+
+  sample_idxs.clear();	// x vals (just for testing)
+  man_encoding.clear();			// y vals (manchester_values)
+
+  //# processing first block, find best initial point to start sampling
+  if (initial == -1){
+    float max = 0.0;
+    float curr = 0.0;
+    int best_init = 0;
+
+    for (int init = 0; init < interval; init++){
+      // reset for next vals
+      curr = 0.0;
+      for (int i = init; i < signalIn.size(); i += interval){
+        curr += abs(signalIn[i]);
+      }
+      if (max < curr){
+        max = curr;
+        initial = init;
+      }
+    }
+  }
+
+	// processing rest of blocks, finding values of samples
+	for (int i = initial; i < signalIn.size(); i += interval){
+		sample_idxs.push_back(i);
+		if (signalIn[i] > 0){	// get a HI
+			man_encoding.push_back(1);
+		}else{					// get a LO
+			man_encoding.push_back(0);
+    }
+  }
+}
+
+void diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_state, std::vector<int> &decoded_bits, int &initial){
+  std::vector<int> bits;
+  decoded_bits.clear();
+  bool is_first_block = false;
+
+  if (initial == -1){
+    is_first_block = true;
+    int ind1 = 0;
+    int ind2 = 0;
+
+    for (int i = 0; i < manchester_values.size() - 1; i += 2){
+      if (manchester_values[i] == 1 && manchester_values[i+1] == 1){ // HH (ignore)
+        ind1++;
+      }else if (manchester_values[i] == 0 && manchester_values[i+1] == 0){ // LL (ignore)
+        ind1++;
+      }
+    }
+
+    for (int i = 1; i < manchester_values.size() - 1; i += 2){
+      if (manchester_values[i] == 1 && manchester_values[i+1] == 1){ // HH (ignore)
+        ind2++;
+      }else if (manchester_values[i] == 0 && manchester_values[i+1] == 0){ // LL (ignore)
+        ind2++;
+      }
+    }
+
+    if (ind1 > ind2){
+      initial = 1;
+    }else{
+      initial = 0;
+    }
+  }
+
+	// in the case that we need state-saving we use this index
+	// which will NOT be returned and end up overwriting the initial index
+	// from block 1
+	int start_index = initial;
+
+	if (initial == 1 && !is_first_block){
+		manchester_values.insert(manchester_values.begin(), cdr_state[0]);
+		start_index = 0;
+  }
+
+	for (int i = start_index; i < manchester_values.size() - 1; i += 2){
+		if (manchester_values[i] == 0 && manchester_values[i+1] == 1){	// LH = 0
+			bits.push_back(0);
+		}else if (manchester_values[i] == 1 && manchester_values[i+1] == 0){ // HL = 1
+			bits.push_back(1);
+		// change the two H's into one H
+    }else if (manchester_values[i] == 1 && manchester_values[i+1] == 1){ // HH (ignore)
+			std::cerr << "Consecutive HI\n";
+		//change the two L's into one L
+    }else if (manchester_values[i] == 0 && manchester_values[i+1] == 0){ //LL (ignore)
+			std::cerr << "Consecutive LO\n";
+    }
+  }
+
+	if (!is_first_block){
+		decoded_bits.push_back(cdr_state[2]);
+	}else{
+		decoded_bits.push_back(bits[0]);
+  }
+
+	for (int i = 1; i < bits.size(); i++){
+		decoded_bits.push_back(bits[i] ^ bits[i-1]);
+  }
+
+}

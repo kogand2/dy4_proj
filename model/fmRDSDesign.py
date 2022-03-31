@@ -92,7 +92,10 @@ if __name__ == "__main__":
 	pll_block = np.array([0.0, 0.0, 1.0, 0.0, 1.0, 1.0, 0.0])
 	prevCarrier = np.zeros(shape=5121)
 
-
+	#variables from frame sync and application layer
+	block_type = None
+	start_point = 0
+	d_service = []
 
 	cdr_state_I = [0, 0, 0]
 	cdr_init_I = -1
@@ -158,7 +161,15 @@ if __name__ == "__main__":
 			samplesI, manchester_values, cdr_init_I = CDR_state(demod_filtI, sps, cdr_init_I)
 			decoded_bits, decoding_init, last_bit = diff_decoding(manchester_values, decoding_init, cdr_state_I)
 			cdr_state_I = [manchester_values[-1], samplesI[-1], last_bit]
-			block, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
+
+			if block_type == None:
+				block_type, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
+				if block_type != None:
+					#application layer
+					block_type, start_point, prev_decoded, d_service = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service)
+			else:
+				#application layer
+				block_type, start_point, prev_decoded, d_service = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service)
 
 		#Generate Plots of Monopath
 		if block_count >= 2 and block_count < 3:

@@ -388,7 +388,7 @@ def diff_decoding(manchester_values, initial, cdr_state):
 
 	for i in range(1, len(bits)):
 		decoded_bits.append(bits[i] ^ bits[i-1])
-		print(i)
+		#print(i)
 
 
 	#print("THIS IS MANCHESTER")
@@ -463,30 +463,91 @@ def frame_sync(decoded_bits, prev_decoded):
 
 	return None, start_point, bit_stream[len(bit_stream) - 25:]
 
-def app_layer(block_type, start_point, decoded_bits, prev_decoded):
+def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service):
 
 	#print("This is the obtained bit_stream")
 	bit_stream = np.append(prev_decoded, decoded_bits)
 	#print(bit_stream)
 	#print(len(bit_stream))
-	if len(bit_stream) >=  26:
+	if len(bit_stream) >=  26: #Repition 11.4 per second
+		d_index = 0
 		if(block_type == "A"):
-
+			print("The PI code is: ", bit_stream[start_point:start_point+4])
+			print("The PI code in hex is: ")
+			PI_hex = [0]*4
+			for i in range(4):
+			    PI_hex[i] = hex(bit_stream[start_point+i])
+			    print(PI_hex[i])
 			block_type = "B"
+
 		elif(block_type == "B"):
+			 #Unsure if masking will be needed
+			if np.array_equal(bit_stream[start_point:start_point+5],np.array([0,0,0,0,0])):
+				print("Group type is 0A")
+				print("Program Type ", bit_stream[start_point+6:11])
+				d_index = int(str(bit_stream[14])+str(bit_stream[15]), 2)
+			else:
+				print("ERROR: type is not 0A")
+			print("Now entering block C")
 			block_type = "C"
+
 		elif(block_type == "C"):
+
+			print("Now entering block D")
 			block_type = "D"
+
 		elif(block_type == "D"):
+			if (len(d_service) != 8):
+				d1 = d2 = ""
+				arr = []
+				for i in range(8):
+					d1 += str(bit_stream[i])
+					d2 += str(bit_stream[i+8])
+
+				print(d1 + " " + d2)
+				arr = bin_to_char(d1 + " " + d2)
+				if (d_index == 0 and len(d_service) == 0):
+					d_service.append(arr[0])
+					d_service.append(arr[1])
+
+				elif (d_index == 1 and len(d_service) == 2):
+					d_service.append(arr[0])
+					d_service.append(arr[1])
+
+				elif (d_index == 2 and len(d_service) == 4):
+					d_service.append(arr[0])
+					d_service.append(arr[1])
+
+				elif (d_index == 4 and len(d_service) == 6):
+					d_service.append(arr[0])
+					d_service.append(arr[1])
+				print(d_service)
+			else:
+				print("Program Service: " + "".join(d_service))
+				d_service = []
+
+			print("Now entering block A")
 			block_type = "A"
 		else:
 			print("Unknown block type")
 
-		return block_type, 0, bit_stream[26:]
+		return block_type, 0, bit_stream[26:], d_service
 
 	else:
 		start_point = 0 #relative to bit stream
-		return block_type, start_point, bit_stream
+		return block_type, start_point, bit_stream, d_service
+
+def bin_to_char(a_binary_string):
+	binary_values = a_binary_string.split()
+
+	ascii_string = []
+	for binary_value in binary_values:
+	    an_integer = int(binary_value, 2)
+	    ascii_character = chr(an_integer)
+	    ascii_string.append(ascii_character)
+
+
+	return ascii_string
 
 def matrixMult(x, y):
 	# This is not a generic matrix multiplication

@@ -434,3 +434,97 @@ int diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_state
 
   return bits[bits.size() - 1];
 }
+
+std::tuple<char, int, std::vector<int>> frame_sync(std::vector<int> decoded_bits, std::vector<int> prev_decoded){
+	int start_point = 0; //relative to bit stream
+	if (prev_decoded.size() == 0){
+		return {'X', start_point, decoded_bits};
+	}else{
+		//print("This is the obtained bit_stream")
+		std::vector<int> bit_stream = prev_decoded;
+    bit_stream.insert(bit_stream.end(), decoded_bits.begin(), decoded_bits.end());
+		//print(bit_stream)
+		//print(len(bit_stream))
+    if (bit_stream.size() >=  26){
+      std::vector<char> block = {'A','B','C','D'};
+      for (int i = 0; i < bit_stream.size() - 25; i++){
+      	std::vector<int> check = std::vector<int>(bit_stream.begin() + i, bit_stream.begin() + i + 26);
+      	std::vector<int> message = matrix_mult(check, get_parity_check());
+      	for (int k = 0; k < block.size(); k++){
+      		if (message == get_syndrome(k)){
+      			std::cerr << "CORRECT SYNDROME OBTAINED\n";
+      			//print(check)
+      			std::cerr << "obtained: " << block[k] << " " << i << "\n";
+      			return {block[k], i, prev_decoded};
+          }
+        }
+      }
+    }
+    return {'X', start_point, std::vector<int>(bit_stream.begin() + bit_stream.size() - 25, bit_stream.end())};
+  }
+}
+
+std::vector<int> matrix_mult(std::vector<int> x, std::vector<std::vector<int>> y){
+	// This is not a generic matrix multiplication
+	// This is build specificaly for bits and expected dimensions
+
+	std::vector<int> result;
+	int value = 0;
+	// iterate through columns of y
+	for (int i = 0; i < y[0].size(); i++){ // iterate through columns of x and rows of y
+
+		for (int k = 0; k < x.size(); k++){
+			//print(str(x[k]) + " and " + str(y[i][k]))
+			//print(k)
+			if (k == 0){
+				value = (x[k] and y[k][i]);
+			}else{
+				value ^= (x[k] and y[k][i]);
+      }
+    }
+		result.push_back(value);
+  }
+	return result;
+}
+
+std::vector<std::vector<int>> get_parity_check(){
+  std::vector<std::vector<int>> parity_check = { \
+  {1,0,0,0,0,0,0,0,0,0}, \
+  {0,1,0,0,0,0,0,0,0,0}, \
+  {0,0,1,0,0,0,0,0,0,0}, \
+  {0,0,0,1,0,0,0,0,0,0}, \
+  {0,0,0,0,1,0,0,0,0,0}, \
+  {0,0,0,0,0,1,0,0,0,0}, \
+  {0,0,0,0,0,0,1,0,0,0}, \
+  {0,0,0,0,0,0,0,1,0,0}, \
+  {0,0,0,0,0,0,0,0,1,0}, \
+  {0,0,0,0,0,0,0,0,0,1}, \
+  {1,0,1,1,0,1,1,1,0,0}, \
+  {0,1,0,1,1,0,1,1,1,0}, \
+  {0,0,1,0,1,1,0,1,1,1}, \
+  {1,0,1,0,0,0,0,1,1,1}, \
+  {1,1,1,0,0,1,1,1,1,1}, \
+  {1,1,0,0,0,1,0,0,1,1}, \
+  {1,1,0,1,0,1,0,1,0,1}, \
+  {1,1,0,1,1,1,0,1,1,0}, \
+  {0,1,1,0,1,1,1,0,1,1}, \
+  {1,0,0,0,0,0,0,0,0,1}, \
+  {1,1,1,1,0,1,1,1,0,0}, \
+  {0,1,1,1,1,0,1,1,1,0}, \
+  {0,0,1,1,1,1,0,1,1,1}, \
+  {1,0,1,0,1,0,0,1,1,1}, \
+  {1,1,1,0,0,0,1,1,1,1}, \
+  {1,1,0,0,0,1,1,0,1,1}};
+  return parity_check;
+}
+
+std::vector<int> get_syndrome(int row){
+	// expected Syndrome array
+	std::vector<std::vector<int>> exp_syndrome = { \
+  {1,1,1,1,0,1,1,0,0,0}, \
+	{1,1,1,1,0,1,0,1,0,0}, \
+	{1,0,0,1,0,1,1,1,0,0}, \
+	{1,0,0,1,0,1,1,0,0,0}};
+
+	return exp_syndrome[row];
+}

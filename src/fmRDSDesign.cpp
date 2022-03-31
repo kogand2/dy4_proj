@@ -135,8 +135,12 @@ std::vector<float> rds_path_main(int mode){
   int cdr_init = -1;
   int decode_init = -1;
   std::vector<int> cdr_state = {0, 0, 0};
-  std::vector<int> sample_idxs, man_encoding, decoded_bits;
+  std::vector<int> sample_idxs, man_encoding, decoded_bits, prev_decoded;
   int last_bit;
+
+  char block_type = 'X';
+  int start_point = 0;
+
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
 		std::vector<float> block_data(block_size);
@@ -202,6 +206,8 @@ std::vector<float> rds_path_main(int mode){
       last_bit = diff_decoding(man_encoding, cdr_state, decoded_bits, decode_init);
       printRealVector(decoded_bits);
       cdr_state = {man_encoding[man_encoding.size() - 1], sample_idxs[sample_idxs.size() - 1], last_bit};
+      std::tie(block_type, start_point, prev_decoded) = frame_sync(decoded_bits, prev_decoded);
+
     }
     //...
 

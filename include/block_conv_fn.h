@@ -43,4 +43,12 @@ void CDR(std::vector<float>, int, int &, std::vector<int> &, std::vector<int> &)
 
 int diff_decoding(std::vector<int>, std::vector<int>, std::vector<int> &, int &);
 
+std::tuple<char, int, std::vector<int>> frame_sync(std::vector<int>, std::vector<int>);
+
+std::vector<int> matrix_mult(std::vector<int> x, std::vector<std::vector<int>> y);
+
+std::vector<std::vector<int>> get_parity_check();
+
+std::vector<int> get_syndrome(int);
+
 #endif // DY4_BLOCKCONVFN_H

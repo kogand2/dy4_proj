@@ -458,11 +458,35 @@ def frame_sync(decoded_bits, prev_decoded):
 				if np.array_equal(message, getSyndrome(k)):
 					print("CORRECT SYNDROME OBTAINED")
 					print("obtained: " + block[k] + " " + str(i))
-					#return block[k], i, decoded_bits
+					return block[k], i, decoded_bits
 
 
 	return None, start_point, bit_stream[len(bit_stream) - 25:]
 
+def app_layer(block_type, start_point, decoded_bits, prev_decoded):
+
+	#print("This is the obtained bit_stream")
+	bit_stream = np.append(prev_decoded, decoded_bits)
+	#print(bit_stream)
+	#print(len(bit_stream))
+	if len(bit_stream) >=  26:
+		if(block_type == "A"):
+
+			block_type = "B"
+		elif(block_type == "B"):
+			block_type = "C"
+		elif(block_type == "C"):
+			block_type = "D"
+		elif(block_type == "D"):
+			block_type = "A"
+		else:
+			print("Unknown block type")
+
+		return block_type, 0, bit_stream[26:]
+
+	else:
+		start_point = 0 #relative to bit stream
+		return block_type, start_point, bit_stream
 
 def matrixMult(x, y):
 	# This is not a generic matrix multiplication

@@ -365,7 +365,7 @@ void CDR(std::vector<float> signalIn, int interval, int &initial, std::vector<in
   }
 }
 
-void diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_state, std::vector<int> &decoded_bits, int &initial){
+int diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_state, std::vector<int> &decoded_bits, int &initial){
   std::vector<int> bits;
   decoded_bits.clear();
   bool is_first_block = false;
@@ -423,7 +423,7 @@ void diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_stat
   }
 
 	if (!is_first_block){
-		decoded_bits.push_back(cdr_state[2]);
+    bits.insert(bits.begin(), cdr_state[2]);
 	}else{
 		decoded_bits.push_back(bits[0]);
   }
@@ -432,4 +432,5 @@ void diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_stat
 		decoded_bits.push_back(bits[i] ^ bits[i-1]);
   }
 
+  return bits[bits.size() - 1];
 }

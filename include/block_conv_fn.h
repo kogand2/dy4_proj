@@ -41,6 +41,6 @@ void rs_block_conv(std::vector<float> &, const std::vector<float> , const std::v
 
 void CDR(std::vector<float>, int, int &, std::vector<int> &, std::vector<int> &);
 
-void diff_decoding(std::vector<int>, std::vector<int>, std::vector<int> &, int &);
+int diff_decoding(std::vector<int>, std::vector<int>, std::vector<int> &, int &);
 
 #endif // DY4_BLOCKCONVFN_H

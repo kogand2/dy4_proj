@@ -95,6 +95,7 @@ if __name__ == "__main__":
 	#variables from frame sync and application layer
 	block_type = None
 	start_point = 0
+	d_index = -1
 	d_service = []
 
 	cdr_state_I = [0, 0, 0]
@@ -164,12 +165,13 @@ if __name__ == "__main__":
 
 			if block_type == None:
 				block_type, start_point, prev_decoded  = frame_sync(decoded_bits, prev_decoded)
+				#print(start_point)
 				if block_type != None:
 					#application layer
-					block_type, start_point, prev_decoded, d_service = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service)
+					block_type, start_point, prev_decoded, d_service, d_index = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_index)
 			else:
 				#application layer
-				block_type, start_point, prev_decoded, d_service = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service)
+				block_type, start_point, prev_decoded, d_service, d_index = app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_index)
 
 		#Generate Plots of Monopath
 		if block_count >= 2 and block_count < 3:

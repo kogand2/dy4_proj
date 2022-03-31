@@ -457,55 +457,75 @@ def frame_sync(decoded_bits, prev_decoded):
 			for k in range(4):
 				if np.array_equal(message, getSyndrome(k)):
 					print("CORRECT SYNDROME OBTAINED")
+					print(check)
 					print("obtained: " + block[k] + " " + str(i))
-					return block[k], i, decoded_bits
+					return block[k], i, prev_decoded
 
 
 	return None, start_point, bit_stream[len(bit_stream) - 25:]
 
-def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service):
+def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_index):
 
 	#print("This is the obtained bit_stream")
 	bit_stream = np.append(prev_decoded, decoded_bits)
+	#print("Bit stream, previous and decoded bits")
 	#print(bit_stream)
 	#print(len(bit_stream))
+	#print(prev_decoded)
+	#print(decoded_bits)
+	#print(len(decoded_bits))
+	#print(len(bit_stream))
+	print("")
 	if len(bit_stream) >=  26: #Repition 11.4 per second
-		d_index = 0
+		print("Block obtained")
+		print(bit_stream[start_point:26+start_point])
 		if(block_type == "A"):
+			print("(====~~~~~~~~~~BLOCK A~~~~~~~~~~====)")
 			print("The PI code is: ", bit_stream[start_point:start_point+4])
 			print("The PI code in hex is: ")
 			PI_hex = [0]*4
 			for i in range(4):
 			    PI_hex[i] = hex(bit_stream[start_point+i])
 			    print(PI_hex[i])
+			print("Now entering block B")
 			block_type = "B"
 
 		elif(block_type == "B"):
-			 #Unsure if masking will be needed
+			#Unsure if masking will be needed
+			print("(====~~~~~~~~~~BLOCK B~~~~~~~~~~====)")
 			if np.array_equal(bit_stream[start_point:start_point+5],np.array([0,0,0,0,0])):
-				print("Group type is 0A")
-				print("Program Type ", bit_stream[start_point+6:11])
-				d_index = int(str(bit_stream[14])+str(bit_stream[15]), 2)
+				print("Group type is ", bit_stream[start_point:start_point+5])
+				print("Program Type ", bit_stream[start_point+6:start_point+11])
+				d_index = int(str(bit_stream[start_point+14])+str(bit_stream[start_point+15]), 2)
+
 			else:
 				print("ERROR: type is not 0A")
+
+			print("d_index is " + str(d_index))
 			print("Now entering block C")
 			block_type = "C"
 
 		elif(block_type == "C"):
-
+			print("(====~~~~~~~~~~BLOCK C~~~~~~~~~~====)")
+			print("--------------")
+			print("--------------")
 			print("Now entering block D")
 			block_type = "D"
 
 		elif(block_type == "D"):
-			if (len(d_service) != 8):
-				d1 = d2 = ""
-				arr = []
-				for i in range(8):
-					d1 += str(bit_stream[i])
-					d2 += str(bit_stream[i+8])
+			print("(====~~~~~~~~~~BLOCK D~~~~~~~~~~====)")
+			d1 = d2 = ""
+			arr = []
+			for i in range(8):
+				d1 += str(bit_stream[start_point+i])
+				d2 += str(bit_stream[start_point+i+8])
 
-				print(d1 + " " + d2)
-				arr = bin_to_char(d1 + " " + d2)
+			print(d1 + " " + d2)
+			print("d_index is " + str(d_index))
+			arr = bin_to_char(d1 + " " + d2)
+			print("to be inserted is " + str(arr))
+			if (len(d_service) < 8):
+
 				if (d_index == 0 and len(d_service) == 0):
 					d_service.append(arr[0])
 					d_service.append(arr[1])
@@ -518,24 +538,26 @@ def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service):
 					d_service.append(arr[0])
 					d_service.append(arr[1])
 
-				elif (d_index == 4 and len(d_service) == 6):
+				elif (d_index == 3 and len(d_service) == 6):
 					d_service.append(arr[0])
 					d_service.append(arr[1])
-				print(d_service)
-			else:
+
+			elif (d_index == 0):
 				print("Program Service: " + "".join(d_service))
 				d_service = []
-
+				d_service.append(arr[0])
+				d_service.append(arr[1])
+			print(d_service)
 			print("Now entering block A")
 			block_type = "A"
 		else:
 			print("Unknown block type")
 
-		return block_type, 0, bit_stream[26:], d_service
+		return block_type, 0, bit_stream[start_point+26:], d_service, d_index
 
 	else:
 		start_point = 0 #relative to bit stream
-		return block_type, start_point, bit_stream, d_service
+		return block_type, start_point, bit_stream, d_service, d_index
 
 def bin_to_char(a_binary_string):
 	binary_values = a_binary_string.split()

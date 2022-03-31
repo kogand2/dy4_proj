@@ -41,7 +41,7 @@ if __name__ == "__main__":
 
 	# read the raw IQ data from the recorded file
 	# IQ data is assumed to be in 8-bits unsigned (and interleaved)
-	in_fname = "../data/samples3.raw"
+	in_fname = "../data/samples8.raw"
 	raw_data = np.fromfile(in_fname, dtype='uint8')
 	print("Read raw RF data from \"" + in_fname + "\" in unsigned 8-bit format")
 	# IQ data is normalized between -1 and +1 in 32-bit float format
@@ -220,7 +220,7 @@ if __name__ == "__main__":
 
 			axs[3].plot(range(len(demod_filtI)), demod_filtI, c='blue')
 			axs[3].plot(samplesI, np.zeros(shape = len(samplesI)), marker="o")
-			print("Length of signal: " + str(len(demod_filtI)))
+			#print("Length of signal: " + str(len(demod_filtI)))
 			plt.show()
 
 		#prev1 = demod_filt

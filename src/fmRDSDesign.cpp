@@ -6,7 +6,6 @@
 #include "logfunc.h"
 #include "block_conv_fn.h"
 #include "mono_path.h"
-
 #include <stdio.h>
 #include <math.h>
 
@@ -44,19 +43,21 @@ std::vector<float> rds_path_main(int mode){
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
-      // HANDLE WITH PRINT STATEMENT
+      std::cerr << "NO RDS DATA AVAILABLE.\n";
+      // return from thread?
       break;
     case 2:
       rf_Fs = 2400000.0;
       rf_decim = 10;
       sps = 30;
-      demod_decim = 1; // NOT CALCULATED
-      demod_exp = 1; // NOT CALCULATED
+      demod_decim = 64; // NOT CALCULATED
+      demod_exp = 19; // NOT CALCULATED
       break;
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
-      // HANDLE WITH PRINT STATEMENT
+      std::cerr << "NO RDS DATA AVAILABLE.\n";
+      // return from thread?
       break;
   }
 
@@ -109,7 +110,6 @@ std::vector<float> rds_path_main(int mode){
 
   rrc_demod_filt.resize(rds_demod_block.size());
 
-
   // state saving variables for RDS path
 	std::vector<float> carrier_state, channel_state, rds_demod_state, rds_rrc_state, pll_state;
 	carrier_state.resize(carrier_coeff.size() - 1);	// for RDS Carrier Recovery
@@ -140,6 +140,8 @@ std::vector<float> rds_path_main(int mode){
 
   char block_type = 'X';
   int start_point = 0;
+  std::string d_service;
+  int d_index = 0;
 
   // decipher each block
 	for(unsigned int block_id = 0; ; block_id++) {
@@ -201,15 +203,24 @@ std::vector<float> rds_path_main(int mode){
     rs_block_conv(rds_demod_filt, mixed_audio, rds_demod_coeff, rds_demod_state, demod_decim, demod_exp, rds_demod_block);
     state_block_conv(rrc_demod_filt, rds_demod_block, rds_rrc_coeff, rds_rrc_state);
 
+    // RDS Demodulation and Data Processing: CDR, decoding, frame snychronization, app layer
     if (block_id >= 1){
       CDR(rrc_demod_filt, sps, cdr_init, sample_idxs, man_encoding);
       last_bit = diff_decoding(man_encoding, cdr_state, decoded_bits, decode_init);
-      printRealVector(decoded_bits);
+      //printRealVector(decoded_bits);
       cdr_state = {man_encoding[man_encoding.size() - 1], sample_idxs[sample_idxs.size() - 1], last_bit};
-      std::tie(block_type, start_point, prev_decoded) = frame_sync(decoded_bits, prev_decoded);
 
+      if (block_type == 'X'){
+        std::tie(block_type, start_point, prev_decoded) = frame_sync(decoded_bits, prev_decoded);
+        // frame synchronized: can begin information extraction
+
+        if (block_type != 'X')
+          std::tie(block_type, start_point, prev_decoded) = app_layer(block_type, start_point, prev_decoded, decoded_bits, d_service, d_index);
+      }
+
+      else
+        std::tie(block_type, start_point, prev_decoded) = app_layer(block_type, start_point, prev_decoded, decoded_bits, d_service, d_index);
     }
-    //...
 
     // timing analysis
     stop_time = std::chrono::high_resolution_clock::now();

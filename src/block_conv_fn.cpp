@@ -415,10 +415,10 @@ int diff_decoding(std::vector<int> manchester_values, std::vector<int> cdr_state
 			bits.push_back(1);
 		// change the two H's into one H
     }else if (manchester_values[i] == 1 && manchester_values[i+1] == 1){ // HH (ignore)
-			std::cerr << "Consecutive HI\n";
+			//std::cerr << "Consecutive HI\n";
 		//change the two L's into one L
     }else if (manchester_values[i] == 0 && manchester_values[i+1] == 0){ //LL (ignore)
-			std::cerr << "Consecutive LO\n";
+			//std::cerr << "Consecutive LO\n";
     }
   }
 
@@ -443,24 +443,149 @@ std::tuple<char, int, std::vector<int>> frame_sync(std::vector<int> decoded_bits
 		//print("This is the obtained bit_stream")
 		std::vector<int> bit_stream = prev_decoded;
     bit_stream.insert(bit_stream.end(), decoded_bits.begin(), decoded_bits.end());
-		//print(bit_stream)
-		//print(len(bit_stream))
-    if (bit_stream.size() >=  26){
-      std::vector<char> block = {'A','B','C','D'};
-      for (int i = 0; i < bit_stream.size() - 25; i++){
-      	std::vector<int> check = std::vector<int>(bit_stream.begin() + i, bit_stream.begin() + i + 26);
-      	std::vector<int> message = matrix_mult(check, get_parity_check());
-      	for (int k = 0; k < block.size(); k++){
-      		if (message == get_syndrome(k)){
-      			std::cerr << "CORRECT SYNDROME OBTAINED\n";
-      			//print(check)
-      			std::cerr << "obtained: " << block[k] << " " << i << "\n";
-      			return {block[k], i, prev_decoded};
-          }
+  //print(bit_stream)
+	//print(len(bit_stream))
+  if (bit_stream.size() >=  26){
+    std::vector<char> block = {'A','B','C','D'};
+    for (int i = 0; i < bit_stream.size() - 25; i++){
+    	std::vector<int> check = std::vector<int>(bit_stream.begin() + i, bit_stream.begin() + i + 26);
+    	std::vector<int> message = matrix_mult(check, get_parity_check());
+    	for (int k = 0; k < block.size(); k++){
+    		if (message == get_syndrome(k)){
+    			//std::cerr << "CORRECT SYNDROME OBTAINED\n";
+    			//print(check)
+    			//std::cerr << "obtained: " << block[k] << " " << i << "\n";
+    			return {block[k], i, prev_decoded};
         }
       }
     }
-    return {'X', start_point, std::vector<int>(bit_stream.begin() + bit_stream.size() - 25, bit_stream.end())};
+  }
+  return {'X', start_point, std::vector<int>(bit_stream.begin() + bit_stream.size() - 25, bit_stream.end())};
+}
+}
+
+std::tuple<char, int, std::vector<int>> app_layer(char block_type, int start_point, std::vector<int> prev_decoded, std::vector<int> decoded_bits, std::string &d_service, int &d_index)
+{
+  // obtain bitstream to be parsed
+  std::vector <int> bit_stream = prev_decoded;
+  bit_stream.insert(bit_stream.end(), decoded_bits.begin(), decoded_bits.end());
+  if (bit_stream.size() >= 26){
+    //std::cerr << "RDS Block obtained\n";
+
+    if (block_type == 'A'){
+      //std::cerr << "---------------------BLOCK A---------------------\n";
+      std::vector <int> pi_code = std::vector<int>(bit_stream.begin() + start_point, bit_stream.begin() + start_point + 16);
+      std::string pi_hex = bin_to_hex(pi_code);
+      std::cerr << "The PI code is: " << pi_hex << "\n";
+
+      block_type = 'B';
+    }
+
+    else if (block_type == 'B'){
+      //std::cerr << "---------------------BLOCK B---------------------\n";
+      std::vector <int> group_check = {0, 0, 0, 0, 0};
+      std::vector <int> group_type = std::vector<int>(bit_stream.begin() + start_point, bit_stream.begin() + start_point + 5);
+      std::vector <int> program_type;
+
+      if (group_type == group_check)
+      {
+        program_type = std::vector<int>(bit_stream.begin() + start_point + 6, bit_stream.begin() + start_point + 11);
+        std::cerr << "Group type is: ";
+        for (int i = 0; i < group_type.size(); i++)
+          std::cerr << group_type[i];
+
+        std::cerr << "\nProgram type is ";
+        for (int i = 0; i < program_type.size(); i++)
+          std::cerr << program_type[i];
+        std::cerr  << "\n";
+
+        d_index = 2 * bit_stream[start_point + 14];
+        d_index += bit_stream[start_point+15];
+      }
+
+      //else
+        //std::cerr << "Group type is not 0A\n";
+
+      block_type = 'C';
+    }
+
+    else if (block_type == 'C'){
+      //std::cerr << "---------------------BLOCK C---------------------\n";
+      // nothing happens
+
+      block_type = 'D';
+    }
+
+    else if (block_type == 'D'){
+      //std::cerr << "---------------------BLOCK D---------------------\n";
+      std::vector <int> d1 = std::vector<int>(bit_stream.begin() + start_point, bit_stream.begin() + start_point + 8);
+      std::vector <int> d2 = std::vector<int>(bit_stream.begin() + start_point + 8, bit_stream.begin() + start_point + 16);
+      int d1_dec = bin_to_dec(d1);
+      int d2_dec = bin_to_dec(d2);
+
+      /*
+      std::cerr << "D1 = ";
+      for (int i = 0; i < d1.size(); i++)
+        std::cerr << d1[i];
+      std::cerr << "\n In decimal: " << d1_dec << "\n";
+      std::cerr << "\n In ASCII: " << char(d1_dec) << "\n";
+
+      std::cerr << "D2 = ";
+      for (int i = 0; i < d2.size(); i++)
+        std::cerr << d2[i];
+      std::cerr << "\n In decimal: " << d2_dec << "\n";
+      std::cerr << "\n In ASCII: " << char(d2_dec) << "\n";
+      std::cerr << "d_index is " << d_index << "\n";
+      */
+
+      if (d_service.size() < 8)
+      {
+        if (d_index == 0 && d_service.size() == 0)
+        {
+          d_service.push_back(char(d1_dec));
+          d_service.push_back(char(d2_dec));
+        }
+
+        else if (d_index == 1 && d_service.size() == 2)
+        {
+          d_service.push_back(char(d1_dec));
+          d_service.push_back(char(d2_dec));
+        }
+
+        else if (d_index == 2 && d_service.size() == 4)
+        {
+          d_service.push_back(char(d1_dec));
+          d_service.push_back(char(d2_dec));
+        }
+
+        else if (d_index == 3 && d_service.size() == 6)
+        {
+          d_service.push_back(char(d1_dec));
+          d_service.push_back(char(d2_dec));
+        }
+      }
+
+      else if (d_index == 0)
+      {
+        std::cerr << "Program Service: " << d_service << "\n";
+
+        d_service.clear();
+        d_service.push_back(char(d1_dec));
+        d_service.push_back(char(d2_dec));
+      }
+
+      block_type = 'A';
+    }
+
+    else
+      std::cerr << "Unknown block type!\n";
+
+    return {block_type, 0, std::vector <int> (bit_stream.begin() + start_point + 26, bit_stream.end())};
+  }
+
+  else{
+    start_point = 0;
+    return {block_type, start_point, bit_stream};
   }
 }
 
@@ -527,4 +652,50 @@ std::vector<int> get_syndrome(int row){
 	{1,0,0,1,0,1,1,0,0,0}};
 
 	return exp_syndrome[row];
+}
+
+// built solely for block A, will not convert properly if bits not multiple of 4
+std::string bin_to_hex(std::vector <int> bin)
+{
+    std::string hex = "";
+    int bin_sum;
+
+    for (int i = 0; i < bin.size(); i += 4)
+    {
+        bin_sum = 0;
+        for (int k = 0; k < 4; k++)
+            bin_sum += bin[i + k] * pow(2, 3 - k);
+
+        if (bin_sum > 9)
+        {
+            if (bin_sum == 10)
+                hex.push_back('A');
+            else if (bin_sum == 11)
+                hex.push_back('B');
+            else if (bin_sum == 12)
+                hex.push_back('C');
+            else if (bin_sum == 13)
+                hex.push_back('D');
+            else if (bin_sum == 14)
+                hex.push_back('E');
+            else if (bin_sum == 15)
+                hex.push_back('F');
+        }
+
+        else{
+            char num = '0' + bin_sum;
+            hex.push_back(num);
+        }
+    }
+    return hex;
+}
+
+int bin_to_dec(std::vector <int> bin)
+{
+    int dec = 0;
+    for (int i = bin.size() - 1; i >= 0; i--)
+    {
+        dec += bin[i]*pow(2, bin.size() - 1 - i);
+    }
+    return dec;
 }

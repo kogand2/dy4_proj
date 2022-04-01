@@ -14,7 +14,6 @@ Ontario, Canada
 #include <vector>
 #include <complex>
 
-
 // declaration of a function prototypes
 std::vector<float> fmDemod(std::vector<float>, std::vector<float>, std::vector<float> &);
 std::vector<float> fmDemodArctan(std::vector<float>, std::vector<float>, float &);
@@ -45,10 +44,16 @@ int diff_decoding(std::vector<int>, std::vector<int>, std::vector<int> &, int &)
 
 std::tuple<char, int, std::vector<int>> frame_sync(std::vector<int>, std::vector<int>);
 
+std::tuple<char, int, std::vector<int>> app_layer(char, int, std::vector<int>, std::vector<int>, std::string &, int &);
+
 std::vector<int> matrix_mult(std::vector<int> x, std::vector<std::vector<int>> y);
 
 std::vector<std::vector<int>> get_parity_check();
 
 std::vector<int> get_syndrome(int);
+
+std::string bin_to_hex(std::vector <int>);
+
+int bin_to_dec(std::vector <int>);
 
 #endif // DY4_BLOCKCONVFN_H

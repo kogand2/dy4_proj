@@ -480,7 +480,7 @@ def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_
 		print("Block obtained")
 		#print(bit_stream[start_point:26+start_point])
 		if(block_type == "A"):
-			print("(====~~~~~~~~~~BLOCK A~~~~~~~~~~====)")
+			#print("(====~~~~~~~~~~BLOCK A~~~~~~~~~~====)")
 			PI_hex = ''
 			for i in range(16):
 				PI_hex+= str(bit_stream[start_point+i])
@@ -493,31 +493,32 @@ def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_
 
 			PI_hex = hex(int(PI_hex, 2))
 
-			print("The PI code is: ", PI_hex[2:])
+			#print("The PI code is: ", PI_hex[2:])
 
-			print("Now entering block B")
+			#print("Now entering block B")
 			block_type = "B"
 
 		elif(block_type == "B"):
 			#Unsure if masking will be needed
-			print("(====~~~~~~~~~~BLOCK B~~~~~~~~~~====)")
+			#print("(====~~~~~~~~~~BLOCK B~~~~~~~~~~====)")
 			if np.array_equal(bit_stream[start_point:start_point+5],np.array([0,0,0,0,0])):
-				print("Group type is ", bit_stream[start_point:start_point+5])
-				print("Program Type ", bit_stream[start_point+6:start_point+11])
+				#print("Group type is ", bit_stream[start_point:start_point+5])
+				#print("Program Type ", bit_stream[start_point+6:start_point+11])
 				d_index = int(str(bit_stream[start_point+14])+str(bit_stream[start_point+15]), 2)
 
 			else:
-				print("ERROR: type is not 0A")
+				pass
+				#print("ERROR: type is not 0A")
 
 			#print("d_index is " + str(d_index))
-			print("Now entering block C")
+			#print("Now entering block C")
 			block_type = "C"
 
 		elif(block_type == "C"):
-			print("(====~~~~~~~~~~BLOCK C~~~~~~~~~~====)")
+			#print("(====~~~~~~~~~~BLOCK C~~~~~~~~~~====)")
 			#print("--------------")
 			#print("--------------")
-			print("Now entering block D")
+			#print("Now entering block D")
 			block_type = "D"
 
 		elif(block_type == "D"):
@@ -528,10 +529,10 @@ def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_
 				d1 += str(bit_stream[start_point+i])
 				d2 += str(bit_stream[start_point+i+8])
 
-			#print(d1 + " " + d2)
-			#print("d_index is " + str(d_index))
+			print(d1 + " " + d2)
+			print("d_index is " + str(d_index))
 			arr = bin_to_char(d1 + " " + d2)
-			#print("to be inserted is " + str(arr))
+			print("to be inserted is " + str(arr))
 			if (len(d_service) < 8):
 
 				if (d_index == 0 and len(d_service) == 0):
@@ -556,7 +557,7 @@ def app_layer(block_type, start_point, decoded_bits, prev_decoded, d_service, d_
 				d_service.append(arr[0])
 				d_service.append(arr[1])
 			#print(d_service)
-			print("Now entering block A")
+			#print("Now entering block A")
 			block_type = "A"
 		else:
 			print("Unknown block type")

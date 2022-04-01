@@ -476,7 +476,7 @@ std::tuple<char, int, std::vector<int>> app_layer(char block_type, int start_poi
       //std::cerr << "---------------------BLOCK A---------------------\n";
       std::vector <int> pi_code = std::vector<int>(bit_stream.begin() + start_point, bit_stream.begin() + start_point + 16);
       std::string pi_hex = bin_to_hex(pi_code);
-      std::cerr << "The PI code is: " << pi_hex << "\n";
+      //std::cerr << "The PI code is: " << pi_hex << "\n";
 
       block_type = 'B';
     }

@@ -6,8 +6,8 @@ McMaster University
 Ontario, Canada
 */
 
-#ifndef DY4_BLOCKCONVFN_H
-#define DY4_BLOCKCONVFN_H
+#ifndef DY4_RADIOFN_H
+#define DY4_RADIOFN_H
 
 // add headers as needed
 #include <iostream>
@@ -16,6 +16,7 @@ Ontario, Canada
 
 // declaration of a function prototypes
 std::vector<float> fmDemod(std::vector<float>, std::vector<float>, std::vector<float> &);
+
 std::vector<float> fmDemodArctan(std::vector<float>, std::vector<float>, float &);
 
 void low_pass_coeff(float, float, int, std::vector<float> &);

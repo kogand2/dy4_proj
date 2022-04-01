@@ -1,4 +1,4 @@
-#include "block_conv_fn.h"
+#include "radio_fn.h"
 #include "dy4.h"
 #include "iofunc.h"
 #include <math.h>
@@ -298,16 +298,20 @@ void rs_block_conv(std::vector<float> &y, const std::vector<float> x, const std:
 
     x_index = (n - phase) / audio_exp;
     y[n] = 0;
+    //std::cerr << "test4\n";
 
 		for (int k = phase; k < h.size(); k += audio_exp){
 			if (x_index >= 0){
+        //std::cerr << "test5\n";
         //std::cerr << "y[" << n << "] += h[" << k << "] * x[" << x_index << "]\n";
 				y[n] += audio_exp * h[k] * x[x_index];
 
       }
       else{
-				y[n] += audio_exp * h[k] * state[state.size() + x_index];
+        //std::cerr << "test6\n";
         //std::cerr << "y[" << n << "] += h[" << k << "] * state[" << state.size() +  x_index << "]\n";
+				y[n] += audio_exp * h[k] * state[state.size() + x_index];
+
       }
       x_index--;
       count++;

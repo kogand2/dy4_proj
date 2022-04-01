@@ -5,9 +5,9 @@ CFLAGS = -c -Wall -O3
 # CFLAGS = -c
 LDFLAGS = -pthread
 INCLUDE = -I../include/
-SOURCES = fmStereoDesign.cpp iofunc.cpp filter.cpp  fourier.cpp  genfunc.cpp  logfunc.cpp block_conv_fn.cpp mono_path.cpp
+SOURCES = threaded_stereo_rds.cpp iofunc.cpp filter.cpp  fourier.cpp  genfunc.cpp  logfunc.cpp radio_fn.cpp
 OBJECTS = $(SOURCES:.cpp=.o)
-EXECUTABLE = fmStereoDesign
+EXECUTABLE = threaded_stereo_rds
 
 all: $(EXECUTABLE) clean
 

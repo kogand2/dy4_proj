@@ -4,7 +4,7 @@
 #include "genfunc.h"
 #include "iofunc.h"
 #include "logfunc.h"
-#include "block_conv_fn.h"
+#include "radio_fn.h"
 #include "mono_path.h"
 
 #include <stdio.h>
@@ -34,8 +34,8 @@ void back_end_rds_consumer(std::queue<std::vector<float>> &sync_queue, \
 {
 
   // Determine custom parameters depending on mode
-  float rf_Fs, audio_Fs;
-  int rf_decim, sps, demod_decim, demod_exp;
+  float rf_Fs;
+  int block_size, rf_decim, sps, demod_decim, demod_exp;
 
   switch(mode) {
     case 0:
@@ -44,31 +44,19 @@ void back_end_rds_consumer(std::queue<std::vector<float>> &sync_queue, \
       sps = 17;
       demod_decim = 1920;
       demod_exp = 323;
-      break;
-    case 1:
-      rf_Fs = 1440000.0;
-      rf_decim = 5;
-      std::cerr << "NO RDS DATA AVAILABLE.\n";
-      // return from thread?
+      block_size = 38400*2;
       break;
     case 2:
       rf_Fs = 2400000.0;
       rf_decim = 10;
       sps = 30;
-      demod_decim = 64; // NOT CALCULATED
-      demod_exp = 19; // NOT CALCULATED
-      break;
-    case 3:
-      rf_Fs = 2304000.0;
-      rf_decim = 9;
-      std::cerr << "NO RDS DATA AVAILABLE.\n";
-      // return from thread?
+      demod_decim = 64;
+      demod_exp = 19;
+      block_size = 24320*2;
       break;
   }
   // RF front end variables
-	float rf_Fc = 100000.0;
-	int rf_taps = 151;
-  int audio_taps = 151;
+  int audio_taps = 101;
 
   auto start_time = std::chrono::high_resolution_clock::now();
   auto stop_time = std::chrono::high_resolution_clock::now();
@@ -77,14 +65,12 @@ void back_end_rds_consumer(std::queue<std::vector<float>> &sync_queue, \
   int rds_sr = sps * 2375;
 
   // filter coefficients for RDS
-  std::vector<float> rf_coeff, carrier_coeff, channel_coeff, rds_demod_coeff, rds_rrc_coeff;
+  std::vector<float> carrier_coeff, channel_coeff, rds_demod_coeff, rds_rrc_coeff;
 
 	band_pass_coeff(113500, 114500, rf_Fs/rf_decim, audio_taps, carrier_coeff);
 	band_pass_coeff(54000, 60000, rf_Fs/rf_decim, audio_taps, channel_coeff);
 	low_pass_coeff((rf_Fs/rf_decim)*demod_exp, 3000, audio_taps*demod_exp, rds_demod_coeff);
-  rrc_coeff(rds_sr, rf_taps, rds_rrc_coeff);
-	int block_size = 38400*2;
-
+  rrc_coeff(rds_sr, audio_taps, rds_rrc_coeff);
 
   // RDS filtered data
   std::vector<float> carrier_filt, channel_filt, recoveredRDS, rds_demod_filt, rrc_demod_filt, demod_down, rds_demod_block;
@@ -113,7 +99,7 @@ void back_end_rds_consumer(std::queue<std::vector<float>> &sync_queue, \
   // RDS demodulation
   std::vector<float> mixed_audio, delay_block, channel_delay;
   mixed_audio.resize((block_size / 2) - 1);
-  delay_block.resize((rf_taps - 1)/2);
+  delay_block.resize((audio_taps - 1)/2);
 
   float prev_phase = 0.0;
 
@@ -140,7 +126,13 @@ void back_end_rds_consumer(std::queue<std::vector<float>> &sync_queue, \
     std::vector<float> IQ_demod = sync_queue.front();
 
     sync_queue.pop();
-    c_var.notify_all();
+
+    if (mode == 0 || mode == 2){
+      c_var.notify_all();
+    }else{
+      c_var.notify_one();
+    }
+
     lock.unlock();
 
     // STEP 2: RDS path
@@ -199,8 +191,8 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
 {
 
   // Determine custom parameters depending on mode
-  float rf_Fs, audio_Fs;
-  int rf_decim, audio_decim, audio_exp;
+  float rf_Fs;
+  int block_size, rf_decim, audio_decim, audio_exp;
 
   switch(mode) {
     case 0:
@@ -208,32 +200,30 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
       rf_decim = 10;
       audio_exp = 1;
       audio_decim = 5;
-      audio_Fs = 48000;
+      block_size = 38400*2;
       break;
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
       audio_exp = 1;
       audio_decim = 6;
-      audio_Fs = 48000;
+      block_size = 102400; //needs to be changed maybe
       break;
     case 2:
       rf_Fs = 2400000.0;
       rf_decim = 10;
       audio_exp = 147;
       audio_decim = 800;
-      audio_Fs = 44100;
+      block_size = 24320*2;
       break;
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
       audio_exp = 441;
       audio_decim = 2560;
-      audio_Fs = 44100;
+      block_size = 38400*2; //needs to be changed maybe
       break;
   }
-
-  int block_size = 38400*2;
 
   // audio path variables
   float audio_Fc = 16000;
@@ -291,7 +281,7 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
   // state saving variable for audio data convolution
   std::vector<float> audio_state;
   audio_state.resize(audio_coeff.size() - 1);
-
+  int count = 0;
   while (!end_of_stream || !sync_queue.empty()){
     // STEP 2: Stereo path
     std::unique_lock<std::mutex> lock(mutex);
@@ -303,10 +293,17 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
     std::vector<float> IQ_demod = sync_queue.front();
 
     sync_queue.pop();
-    c_var.notify_all();
-    lock.unlock();
 
-    //std::cerr << "Consume\n";
+    if (mode == 0 || mode == 2){
+      c_var.notify_all();
+    }else{
+      c_var.notify_one();
+    }
+
+    lock.unlock();
+    count += 1;
+
+    std::cerr << "count: " << count << "\n";
     start_time = std::chrono::high_resolution_clock::now();
     //Stereo Carrier Recovery: Bandpass -> PLL -> Numerically Controlled
 		state_block_conv(carrier_filt, IQ_demod, carrier_coeff, carrier_state);
@@ -319,13 +316,14 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
 		mixer(recoveredStereo, channel_filt, mixed_audio);
 
     stereo_block.clear();
+    std::cerr << "test1\n";
     if (mode == 0 || mode == 1)
 		  ds_block_conv(stereo_filt, mixed_audio, audio_coeff, stereo_state, audio_decim, stereo_block);
     else
       rs_block_conv(stereo_filt, mixed_audio, audio_coeff, stereo_state, audio_decim, audio_exp, stereo_block);
 
     all_pass_coeff(mono_input, IQ_demod, delay_block);
-
+    std::cerr << "test2\n";
     audio_block.clear();
     if (mode == 0 || mode == 1)
       ds_block_conv(audio_filt, mono_input, audio_coeff, audio_state, audio_decim, audio_block);
@@ -355,6 +353,7 @@ void back_end_stereo_consumer(std::queue<std::vector<float>> &sync_queue, \
 
     fwrite(&audio_data[0], sizeof(short int), audio_data.size(), stdout);
   }
+  std::cerr << "test3\n";
   std::cerr << "STEREO PATH RUNTIME: " << STEREO_run_time.count() << " ms" << "\n";
 }
 
@@ -372,36 +371,28 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue_stereo, \
 
   // Determine custom parameters depending on mode
   float rf_Fs, audio_Fs;
-  int rf_decim, audio_decim, audio_exp;
+  int block_size, rf_decim, audio_decim, audio_exp;
 
   switch(mode) {
     case 0:
       rf_Fs = 2400000.0;
       rf_decim = 10;
-      audio_exp = 1;
-      audio_decim = 5;
-      audio_Fs = 48000;
+      block_size = 38400*2;
       break;
     case 1:
       rf_Fs = 1440000.0;
       rf_decim = 5;
-      audio_exp = 1;
-      audio_decim = 6;
-      audio_Fs = 48000;
+      block_size = 102400; //needs to be changed maybe?
       break;
     case 2:
       rf_Fs = 2400000.0;
       rf_decim = 10;
-      audio_exp = 147;
-      audio_decim = 800;
-      audio_Fs = 44100;
+      block_size = 24320*2;
       break;
     case 3:
       rf_Fs = 2304000.0;
       rf_decim = 9;
-      audio_exp = 441;
-      audio_decim = 2560;
-      audio_Fs = 44100;
+      block_size = 38400*2; //needs to be changed maybe?
       break;
   }
 
@@ -409,16 +400,10 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue_stereo, \
 	float rf_Fc = 100000.0;
 	int rf_taps = 101;
 
-  // audio path variables
-	float audio_Fc = 16000;
-	int audio_taps = 101;
-
-  // filter coefficients for RF, Stereo, Mono
+  // filter coefficients for RF
   std::vector<float> rf_coeff;
 	low_pass_coeff(rf_Fs, rf_Fc, rf_taps, rf_coeff);
-
-	int block_size = 38400*2;
-
+  std::cerr << "test\n";
   // regular IQ data
   std::vector<float> i_data, q_data;
   i_data.resize(block_size / 2);
@@ -443,6 +428,7 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue_stereo, \
 	std::vector<float> IQ_demod;
   float prev_phase = 0.0;
   int block_id = 0;
+
   // decipher each block
 	while(1) {
     //std::cerr << "Produce\n";
@@ -454,8 +440,6 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue_stereo, \
       std::cerr << "RF DOWNSAMPLE RUNTIME: " << RF_run_time.count() << " ms" << "\n";
       break;
     }
-
-    //std::cerr << "Processing Block " << block_id << std::endl;
 
     // STEP 1: IQ samples demodulation
     // take IQ data in
@@ -480,16 +464,26 @@ void rf_front_end_producer(std::queue<std::vector<float>> &sync_queue_stereo, \
 
     std::unique_lock<std::mutex> lock(mutex);
 
-    while (sync_queue_stereo.size() >= 4 || sync_queue_rds.size() >= 4){
-      c_var.wait(lock);
+    if (mode == 0 || mode == 2){
+      while (sync_queue_stereo.size() >= 5 || sync_queue_rds.size() >= 5){
+        c_var.wait(lock);
+      }
+
+      sync_queue_stereo.push(IQ_demod);
+      sync_queue_rds.push(IQ_demod);
+
+      c_var.notify_all();
+      lock.unlock();
+    }else{
+      while (sync_queue_stereo.size() >= 5){
+        c_var.wait(lock);
+      }
+
+      sync_queue_stereo.push(IQ_demod);
+
+      c_var.notify_one();
+      lock.unlock();
     }
-
-    sync_queue_stereo.push(IQ_demod);
-    sync_queue_rds.push(IQ_demod);
-
-    c_var.notify_all();
-    lock.unlock();
-
     block_id++;
   }
 }
@@ -502,18 +496,32 @@ void stereo_path_main(int mode){
   std::mutex mutex;
   std::condition_variable c_var;
 
-  std::thread rf_front_end = std::thread(rf_front_end_producer, std::ref(sync_queue_stereo), \
-    std::ref(sync_queue_rds), std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
+  if (mode == 0 || mode == 2){
+    std::thread rf_front_end = std::thread(rf_front_end_producer, std::ref(sync_queue_stereo), \
+      std::ref(sync_queue_rds), std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
 
-  std::thread stereo_back_end = std::thread(back_end_stereo_consumer, std::ref(sync_queue_stereo), \
-    std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
+    std::thread stereo_back_end = std::thread(back_end_stereo_consumer, std::ref(sync_queue_stereo), \
+      std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
 
-  std::thread rds_back_end = std::thread(back_end_rds_consumer, std::ref(sync_queue_rds), \
-    std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
+    std::thread rds_back_end = std::thread(back_end_rds_consumer, std::ref(sync_queue_rds), \
+      std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
 
-  rf_front_end.join();
-  stereo_back_end.join();
-  rds_back_end.join();
+    rf_front_end.join();
+    stereo_back_end.join();
+    rds_back_end.join();
+
+  }else{
+    std::cerr << "RDS IS NOT AVAILABLE IN THIS MODE.\n";
+
+    std::thread rf_front_end = std::thread(rf_front_end_producer, std::ref(sync_queue_stereo), \
+      std::ref(sync_queue_rds), std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
+
+    std::thread stereo_back_end = std::thread(back_end_stereo_consumer, std::ref(sync_queue_stereo), \
+      std::ref(mutex), std::ref(c_var), std::ref(mode), std::ref(end_of_stream));
+
+    rf_front_end.join();
+    stereo_back_end.join();
+  }
 
   auto stop_time = std::chrono::high_resolution_clock::now();
   std::chrono::duration<double, std::milli> total_time = stop_time - start_time;

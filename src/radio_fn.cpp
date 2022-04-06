@@ -494,7 +494,7 @@ std::tuple<char, int, std::vector<int>> app_layer(char block_type, int start_poi
       if (group_type == group_check)
       {
         program_type = std::vector<int>(bit_stream.begin() + start_point + 6, bit_stream.begin() + start_point + 11);
-        std::cerr << "Group type is: ";
+        /*std::cerr << "Group type is: ";
         for (int i = 0; i < group_type.size(); i++)
           std::cerr << group_type[i];
 
@@ -502,7 +502,7 @@ std::tuple<char, int, std::vector<int>> app_layer(char block_type, int start_poi
         for (int i = 0; i < program_type.size(); i++)
           std::cerr << program_type[i];
         std::cerr  << "\n";
-
+        */
         d_index = 2 * bit_stream[start_point + 14];
         d_index += bit_stream[start_point+15];
       }
@@ -571,7 +571,7 @@ std::tuple<char, int, std::vector<int>> app_layer(char block_type, int start_poi
 
       else if (d_index == 0)
       {
-        std::cerr << "Program Service: " << d_service << "\n";
+        //std::cerr << "Program Service: " << d_service << "\n";
 
         d_service.clear();
         d_service.push_back(char(d1_dec));
